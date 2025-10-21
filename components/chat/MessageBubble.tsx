@@ -6,8 +6,8 @@
 import { Avatar } from "@/components/common/Avatar";
 import { colors } from "@/theme/colors";
 import { Message } from "@/types";
-import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface MessageBubbleProps {
   message: Message;
@@ -32,6 +32,25 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   totalParticipants = 0,
   onReadStatusPress,
 }) => {
+  const slideAnim = useRef(new Animated.Value(20)).current;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // Slide and fade in animation on mount
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
+
   // Check if this is a system message
   const isSystemMessage = message.senderId === "system";
 
@@ -72,19 +91,34 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   // Render system message
   if (isSystemMessage) {
     return (
-      <View style={styles.systemMessageContainer}>
+      <Animated.View
+        style={[
+          styles.systemMessageContainer,
+          { opacity: fadeAnim, transform: [{ translateY: slideAnim }] },
+        ]}
+      >
         <View style={styles.systemMessageBubble}>
           <Text style={styles.systemMessageText}>{message.text}</Text>
         </View>
-      </View>
+      </Animated.View>
     );
   }
 
   return (
-    <View
+    <Animated.View
       style={[
         styles.container,
         isOwnMessage ? styles.containerOwn : styles.containerOther,
+        {
+          opacity: fadeAnim,
+          transform: [
+            {
+              translateX: isOwnMessage
+                ? slideAnim
+                : Animated.multiply(slideAnim, -1),
+            },
+          ],
+        },
       ]}
     >
       {/* Avatar for received group messages */}
@@ -198,7 +232,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {isOwnMessage && isGroupChat && !showAvatar && (
         <View style={styles.avatarSpacer} />
       )}
-    </View>
+    </Animated.View>
   );
 };
 
@@ -250,11 +284,11 @@ const styles = StyleSheet.create({
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: 2,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOpacity: 0.15,
+    shadowRadius: 2,
+    elevation: 2,
   },
   bubbleOwn: {
     backgroundColor: colors.primary,
@@ -295,8 +329,9 @@ const styles = StyleSheet.create({
     color: colors.light.textTertiary,
   },
   statusIcon: {
-    fontSize: 11,
-    color: "rgba(255, 255, 255, 0.8)",
+    fontSize: 14,
+    fontWeight: "600",
+    color: "rgba(255, 255, 255, 0.9)",
   },
   statusIconRead: {
     color: "#4ADE80", // Green for read (better visibility on blue)

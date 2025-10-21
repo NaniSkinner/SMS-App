@@ -8,8 +8,8 @@ import { subscribeToUserPresence } from "@/services/presence";
 import { colors } from "@/theme/colors";
 import { Conversation } from "@/types";
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
 
 interface ConversationListItemProps {
   conversation: Conversation;
@@ -25,6 +25,39 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState<Date | null>(null);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const badgeScale = useRef(new Animated.Value(1)).current;
+
+  // Fade in animation on mount
+  useEffect(() => {
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, []);
+
+  // Pulse animation for unread badge
+  useEffect(() => {
+    if (unreadCount > 0) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(badgeScale, {
+            toValue: 1.15,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(badgeScale, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      badgeScale.setValue(1);
+    }
+  }, [unreadCount]);
 
   // Get the other user's details (for direct conversations)
   const getOtherUser = () => {
@@ -99,61 +132,68 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   };
 
   return (
-    <Pressable
-      style={({ pressed }) => [styles.container, pressed && styles.pressed]}
-      onPress={handlePress}
-    >
-      <Avatar
-        displayName={displayName}
-        photoURL={
-          conversation.type === "direct" ? otherUser?.photoURL : undefined
-        }
-        size={48}
-        showOnlineIndicator={conversation.type === "direct"}
-        isOnline={isOnline}
-      />
+    <Animated.View style={{ opacity: fadeAnim }}>
+      <Pressable
+        style={({ pressed }) => [styles.container, pressed && styles.pressed]}
+        onPress={handlePress}
+      >
+        <Avatar
+          displayName={displayName}
+          photoURL={
+            conversation.type === "direct" ? otherUser?.photoURL : undefined
+          }
+          size={48}
+          showOnlineIndicator={conversation.type === "direct"}
+          isOnline={isOnline}
+        />
 
-      <View style={styles.content}>
-        <View style={styles.topRow}>
-          <Text
-            style={[styles.name, unreadCount > 0 && styles.nameUnread]}
-            numberOfLines={1}
-          >
-            {displayName}
-          </Text>
-          {conversation.lastMessage && (
-            <Text style={styles.timestamp}>
-              {formatTimestamp(conversation.lastMessage.timestamp)}
-            </Text>
-          )}
-        </View>
-
-        <View style={styles.bottomRow}>
-          {conversation.lastMessage ? (
+        <View style={styles.content}>
+          <View style={styles.topRow}>
             <Text
-              style={[
-                styles.lastMessage,
-                unreadCount > 0 && styles.lastMessageUnread,
-              ]}
+              style={[styles.name, unreadCount > 0 && styles.nameUnread]}
               numberOfLines={1}
             >
-              {conversation.type === "group" &&
-                conversation.lastMessage.senderId !== currentUserId &&
-                `${conversation.lastMessage.senderName}: `}
-              {truncateText(conversation.lastMessage.text)}
+              {displayName}
             </Text>
-          ) : (
-            <Text style={styles.noMessages}>No messages yet</Text>
-          )}
+            {conversation.lastMessage && (
+              <Text style={styles.timestamp}>
+                {formatTimestamp(conversation.lastMessage.timestamp)}
+              </Text>
+            )}
+          </View>
 
-          {unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{unreadCount}</Text>
-            </View>
-          )}
+          <View style={styles.bottomRow}>
+            {conversation.lastMessage ? (
+              <Text
+                style={[
+                  styles.lastMessage,
+                  unreadCount > 0 && styles.lastMessageUnread,
+                ]}
+                numberOfLines={1}
+              >
+                {conversation.type === "group" &&
+                  conversation.lastMessage.senderId !== currentUserId &&
+                  `${conversation.lastMessage.senderName}: `}
+                {truncateText(conversation.lastMessage.text)}
+              </Text>
+            ) : (
+              <Text style={styles.noMessages}>No messages yet</Text>
+            )}
+
+            {unreadCount > 0 && (
+              <Animated.View
+                style={[
+                  styles.unreadBadge,
+                  { transform: [{ scale: badgeScale }] },
+                ]}
+              >
+                <Text style={styles.unreadCount}>{unreadCount}</Text>
+              </Animated.View>
+            )}
+          </View>
         </View>
-      </View>
-    </Pressable>
+      </Pressable>
+    </Animated.View>
   );
 };
 

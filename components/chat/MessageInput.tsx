@@ -7,11 +7,13 @@ import { colors } from "@/theme/colors";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Platform,
   Pressable,
   StyleSheet,
   TextInput,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface MessageInputProps {
   onSend: (text: string) => void;
@@ -28,6 +30,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   onTypingStart,
   onTypingStop,
 }) => {
+  const insets = useSafeAreaInsets();
   const [text, setText] = useState("");
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<number | null>(null);
@@ -84,7 +87,14 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const isDisabled = !text.trim() || isSending;
 
   return (
-    <View style={styles.container}>
+    <View
+      style={[
+        styles.container,
+        {
+          paddingBottom: Platform.OS === "ios" ? Math.max(insets.bottom, 8) : 8,
+        },
+      ]}
+    >
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
@@ -126,7 +136,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-end",
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    paddingTop: 8,
     backgroundColor: colors.light.background,
     borderTopWidth: 1,
     borderTopColor: colors.light.border,

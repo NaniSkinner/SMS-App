@@ -58,10 +58,10 @@ export const Avatar: React.FC<AvatarProps> = ({
           style={[
             styles.onlineIndicator,
             {
-              width: size * 0.25,
-              height: size * 0.25,
-              borderRadius: size * 0.125,
-              borderWidth: size * 0.04,
+              width: size * 0.35,
+              height: size * 0.35,
+              borderRadius: size * 0.175,
+              borderWidth: size * 0.06,
             },
           ]}
         />

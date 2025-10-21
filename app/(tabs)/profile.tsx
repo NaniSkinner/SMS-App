@@ -48,13 +48,15 @@ export default function ProfileScreen() {
         {/* Avatar Placeholder */}
         <View style={styles.avatar}>
           <Text style={styles.avatarText}>
-            {user?.displayName?.charAt(0).toUpperCase() || "U"}
+            {user?.displayName && user.displayName.length > 0
+              ? user.displayName.charAt(0).toUpperCase()
+              : "U"}
           </Text>
         </View>
 
         {/* User Info */}
-        <Text style={styles.name}>{user?.displayName}</Text>
-        <Text style={styles.email}>{user?.email}</Text>
+        <Text style={styles.name}>{user?.displayName || "User"}</Text>
+        <Text style={styles.email}>{user?.email || "No email"}</Text>
 
         {/* Sign Out Button */}
         <TouchableOpacity
