@@ -11,6 +11,7 @@ import {
   getDoc,
   getDocs,
   increment,
+  onSnapshot,
   query,
   serverTimestamp,
   setDoc,
@@ -347,6 +348,162 @@ export const getConversations = async (
       success: false,
       error: "Failed to load conversations.",
     };
+  }
+};
+
+/**
+ * Get unread count for a specific conversation
+ */
+export const getUnreadCount = async (
+  userId: string,
+  conversationId: string
+): Promise<ApiResponse<number>> => {
+  try {
+    const userConvRef = doc(
+      db,
+      "users",
+      userId,
+      "conversations",
+      conversationId
+    );
+    const userConvSnap = await getDoc(userConvRef);
+
+    if (userConvSnap.exists()) {
+      const unreadCount = userConvSnap.data().unreadCount || 0;
+      return {
+        success: true,
+        data: unreadCount,
+      };
+    }
+
+    return {
+      success: true,
+      data: 0,
+    };
+  } catch (error: any) {
+    console.error("❌ Error getting unread count:", error);
+    return {
+      success: false,
+      error: "Failed to get unread count.",
+    };
+  }
+};
+
+/**
+ * Reset unread count to 0 for a conversation
+ */
+export const resetUnreadCount = async (
+  userId: string,
+  conversationId: string
+): Promise<ApiResponse<void>> => {
+  try {
+    const userConvRef = doc(
+      db,
+      "users",
+      userId,
+      "conversations",
+      conversationId
+    );
+
+    await setDoc(
+      userConvRef,
+      {
+        unreadCount: 0,
+      },
+      { merge: true }
+    );
+
+    console.log(
+      `✅ Reset unread count for user ${userId}, conversation ${conversationId}`
+    );
+
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error("❌ Error resetting unread count:", error);
+    return {
+      success: false,
+      error: "Failed to reset unread count.",
+    };
+  }
+};
+
+/**
+ * Get unread counts for all user's conversations
+ */
+export const getAllUnreadCounts = async (
+  userId: string
+): Promise<ApiResponse<Record<string, number>>> => {
+  try {
+    const userConversationsRef = collection(
+      db,
+      "users",
+      userId,
+      "conversations"
+    );
+    const userConvSnapshot = await getDocs(userConversationsRef);
+
+    const unreadCounts: Record<string, number> = {};
+    userConvSnapshot.docs.forEach((doc) => {
+      unreadCounts[doc.id] = doc.data().unreadCount || 0;
+    });
+
+    console.log(`✅ Loaded unread counts for user ${userId}`);
+
+    return {
+      success: true,
+      data: unreadCounts,
+    };
+  } catch (error: any) {
+    console.error("❌ Error getting all unread counts:", error);
+    return {
+      success: false,
+      error: "Failed to load unread counts.",
+    };
+  }
+};
+
+/**
+ * Subscribe to real-time updates for user's conversations (including unread counts)
+ * Returns an unsubscribe function
+ */
+export const subscribeToUserConversations = (
+  userId: string,
+  onUpdate: (unreadCounts: Record<string, number>) => void
+): (() => void) => {
+  try {
+    const userConversationsRef = collection(
+      db,
+      "users",
+      userId,
+      "conversations"
+    );
+
+    const unsubscribe = onSnapshot(
+      userConversationsRef,
+      (snapshot) => {
+        const unreadCounts: Record<string, number> = {};
+
+        snapshot.docs.forEach((doc) => {
+          unreadCounts[doc.id] = doc.data().unreadCount || 0;
+        });
+
+        console.log(
+          `🔄 Real-time unread counts updated for user ${userId}`,
+          unreadCounts
+        );
+        onUpdate(unreadCounts);
+      },
+      (error) => {
+        console.error("❌ Error in unread counts subscription:", error);
+      }
+    );
+
+    return unsubscribe;
+  } catch (error: any) {
+    console.error("❌ Error setting up unread counts subscription:", error);
+    return () => {}; // Return no-op unsubscribe function
   }
 };
 

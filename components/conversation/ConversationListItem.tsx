@@ -1,13 +1,14 @@
 /**
  * ConversationListItem Component
- * Displays a single conversation in the chat list
+ * Displays a single conversation in the chat list with real-time presence
  */
 
 import { Avatar } from "@/components/common/Avatar";
+import { subscribeToUserPresence } from "@/services/presence";
 import { colors } from "@/theme/colors";
 import { Conversation } from "@/types";
 import { useRouter } from "expo-router";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface ConversationListItemProps {
@@ -22,6 +23,8 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   unreadCount = 0,
 }) => {
   const router = useRouter();
+  const [isOnline, setIsOnline] = useState(false);
+  const [lastSeen, setLastSeen] = useState<Date | null>(null);
 
   // Get the other user's details (for direct conversations)
   const getOtherUser = () => {
@@ -30,13 +33,33 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
         (id) => id !== currentUserId
       );
       if (otherUserId) {
-        return conversation.participantDetails[otherUserId];
+        return {
+          ...conversation.participantDetails[otherUserId],
+          userId: otherUserId,
+        };
       }
     }
     return null;
   };
 
   const otherUser = getOtherUser();
+
+  // Subscribe to real-time presence for the other user (direct chats only)
+  useEffect(() => {
+    if (!otherUser || conversation.type !== "direct") return;
+
+    const unsubscribe = subscribeToUserPresence(
+      otherUser.userId,
+      (online, lastSeenDate) => {
+        setIsOnline(online);
+        setLastSeen(lastSeenDate);
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [otherUser?.userId, conversation.type]);
 
   // Determine display name
   const displayName =
@@ -87,7 +110,7 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
         }
         size={48}
         showOnlineIndicator={conversation.type === "direct"}
-        isOnline={otherUser?.isOnline}
+        isOnline={isOnline}
       />
 
       <View style={styles.content}>

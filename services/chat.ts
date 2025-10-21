@@ -266,14 +266,30 @@ export const markMessagesAsDelivered = async (
   }
 };
 
+// Throttle map to prevent excessive read receipt updates
+const readReceiptThrottleMap = new Map<string, number>();
+const THROTTLE_DELAY = 2000; // 2 seconds
+
 /**
- * Mark messages as read for a user
+ * Mark messages as read for a user (with throttling)
  */
 export const markMessagesAsRead = async (
   conversationId: string,
   userId: string
 ): Promise<ApiResponse<void>> => {
   try {
+    // Throttle read receipts: only allow one update per conversation every 2 seconds
+    const throttleKey = `${conversationId}-${userId}`;
+    const lastUpdate = readReceiptThrottleMap.get(throttleKey) || 0;
+    const now = Date.now();
+
+    if (now - lastUpdate < THROTTLE_DELAY) {
+      console.log("⏱️ Throttling read receipt update");
+      return { success: true };
+    }
+
+    readReceiptThrottleMap.set(throttleKey, now);
+
     const messagesRef = collection(
       db,
       "conversations",
@@ -305,7 +321,7 @@ export const markMessagesAsRead = async (
       }
     });
 
-    // Execute all updates
+    // Execute all updates in parallel (batching)
     await Promise.all(batch);
 
     if (batch.length > 0) {

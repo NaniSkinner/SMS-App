@@ -1,10 +1,10 @@
 /**
  * MessageInput Component
- * Multi-line text input for sending messages
+ * Multi-line text input for sending messages with typing indicators
  */
 
 import { colors } from "@/theme/colors";
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -17,21 +17,69 @@ interface MessageInputProps {
   onSend: (text: string) => void;
   isSending?: boolean;
   placeholder?: string;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
 }
 
 export const MessageInput: React.FC<MessageInputProps> = ({
   onSend,
   isSending = false,
   placeholder = "Type a message...",
+  onTypingStart,
+  onTypingStop,
 }) => {
   const [text, setText] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<number | null>(null);
+
+  // Handle text change with typing detection
+  const handleTextChange = (newText: string) => {
+    setText(newText);
+
+    // Start typing indicator
+    if (!isTyping && newText.trim() && onTypingStart) {
+      setIsTyping(true);
+      onTypingStart();
+    }
+
+    // Reset timeout for typing stop
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Stop typing after 3 seconds of no typing
+    typingTimeoutRef.current = setTimeout(() => {
+      if (onTypingStop) {
+        onTypingStop();
+      }
+      setIsTyping(false);
+    }, 3000) as unknown as number;
+  };
 
   const handleSend = () => {
     if (text.trim() && !isSending) {
+      // Clear typing indicator
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (isTyping && onTypingStop) {
+        onTypingStop();
+      }
+      setIsTyping(false);
+
       onSend(text.trim());
       setText("");
     }
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const isDisabled = !text.trim() || isSending;
 
@@ -41,7 +89,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         <TextInput
           style={styles.input}
           value={text}
-          onChangeText={setText}
+          onChangeText={handleTextChange}
           placeholder={placeholder}
           placeholderTextColor={colors.light.textTertiary}
           multiline

@@ -10,8 +10,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { colors } from "@/theme/colors";
 import { User } from "@/types";
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -33,6 +33,14 @@ export default function UsersScreen() {
   useEffect(() => {
     loadUsers();
   }, []);
+
+  // Reset loading state when screen comes back into focus
+  useFocusEffect(
+    useCallback(() => {
+      setIsCreatingConversation(false);
+      setError(null);
+    }, [])
+  );
 
   const loadUsers = async () => {
     if (!currentUser) return;
@@ -56,12 +64,21 @@ export default function UsersScreen() {
 
     setIsCreatingConversation(true);
 
+    // Timeout failsafe - max 10 seconds
+    const timeout = setTimeout(() => {
+      console.warn("⚠️ Conversation creation timeout");
+      setIsCreatingConversation(false);
+      setError("Request timed out. Please try again.");
+    }, 10000);
+
     try {
       // Get or create conversation with selected user
       const result = await getOrCreateConversation(
         currentUser.id,
         selectedUser.id
       );
+
+      clearTimeout(timeout); // Clear timeout on success
 
       if (result.success && result.data) {
         console.log("✅ Conversation ready, adding to store and navigating...");
@@ -71,11 +88,17 @@ export default function UsersScreen() {
 
         // Navigate to the conversation
         router.push(`/chat/${result.data.id}`);
+
+        // Reset state after navigation (slight delay for smooth transition)
+        setTimeout(() => {
+          setIsCreatingConversation(false);
+        }, 500);
       } else {
         setError(result.error || "Failed to create conversation");
         setIsCreatingConversation(false);
       }
     } catch (err) {
+      clearTimeout(timeout); // Clear timeout on error
       console.error("Error creating conversation:", err);
       setError("Failed to create conversation");
       setIsCreatingConversation(false);

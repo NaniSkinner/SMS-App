@@ -5,7 +5,7 @@
 
 import { auth } from "@/services/firebase.config";
 import { createUserProfile, getUserProfile } from "@/services/user";
-import { AuthState } from "@/types";
+import { ApiResponse, AuthState, User } from "@/types";
 import { onAuthStateChanged } from "firebase/auth";
 import { create } from "zustand";
 
@@ -60,10 +60,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     return new Promise((resolve) => {
       set({ isLoading: true });
 
+      // Timeout to prevent infinite loading (10 seconds max)
+      const timeout = setTimeout(() => {
+        console.warn(
+          "⚠️ Auth initialization timeout - proceeding without auth"
+        );
+        get().clearUser();
+        resolve();
+      }, 10000);
+
       // Listen to Firebase auth state changes
       const unsubscribe = onAuthStateChanged(
         auth,
         async (firebaseUser) => {
+          clearTimeout(timeout); // Clear timeout when auth state received
+
           console.log(
             "🔄 Auth state changed, user:",
             firebaseUser?.email || "null"
@@ -72,34 +83,58 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           if (firebaseUser) {
             console.log("🔐 User authenticated:", firebaseUser.email);
 
-            // Fetch full user profile from Firestore
-            console.log("📥 Fetching user profile from Firestore...");
-            const result = await getUserProfile(firebaseUser.uid);
+            try {
+              // Fetch full user profile from Firestore with timeout
+              console.log("📥 Fetching user profile from Firestore...");
+              const result = await Promise.race([
+                getUserProfile(firebaseUser.uid),
+                new Promise<ApiResponse<User>>((_, reject) =>
+                  setTimeout(
+                    () => reject(new Error("Profile fetch timeout")),
+                    5000
+                  )
+                ),
+              ]);
 
-            if (result.success && result.data) {
-              console.log("✅ User profile loaded successfully");
-              get().setUser(result.data);
-            } else {
-              // If profile doesn't exist, create it
-              console.log("📝 Profile not found, creating new user profile...");
-              const createResult = await createUserProfile(
-                firebaseUser.uid,
-                firebaseUser.email!,
-                firebaseUser.displayName || "User"
-              );
-
-              if (createResult.success && createResult.data) {
-                console.log("✅ User profile created successfully");
-                get().setUser(createResult.data);
+              if (result.success && result.data) {
+                console.log("✅ User profile loaded successfully");
+                get().setUser(result.data);
               } else {
-                console.error(
-                  "❌ Failed to create user profile:",
-                  createResult.error
+                // If profile doesn't exist, create it
+                console.log(
+                  "📝 Profile not found, creating new user profile..."
                 );
-                get().setError(
-                  createResult.error || "Failed to load user profile"
-                );
+                const createResult = await Promise.race([
+                  createUserProfile(
+                    firebaseUser.uid,
+                    firebaseUser.email!,
+                    firebaseUser.displayName || "User"
+                  ),
+                  new Promise<ApiResponse<User>>((_, reject) =>
+                    setTimeout(
+                      () => reject(new Error("Profile creation timeout")),
+                      5000
+                    )
+                  ),
+                ]);
+
+                if (createResult.success && createResult.data) {
+                  console.log("✅ User profile created successfully");
+                  get().setUser(createResult.data);
+                } else {
+                  console.error(
+                    "❌ Failed to create user profile:",
+                    createResult.error
+                  );
+                  get().setError(
+                    createResult.error || "Failed to load user profile"
+                  );
+                }
               }
+            } catch (error: any) {
+              console.error("❌ Error loading user profile:", error);
+              // Even on error, set loading to false so app isn't stuck
+              get().setError("Failed to load user profile");
             }
           } else {
             console.log("👤 No user authenticated");
@@ -109,6 +144,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           resolve();
         },
         (error) => {
+          clearTimeout(timeout);
           console.error("❌ Auth state change error:", error);
           get().setError("Authentication error occurred");
           resolve();

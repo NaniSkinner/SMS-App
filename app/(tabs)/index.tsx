@@ -5,7 +5,10 @@
 
 import { ConversationListItem } from "@/components/conversation/ConversationListItem";
 import { cacheConversations, getCachedConversations } from "@/services/cache";
-import { getConversations } from "@/services/conversations";
+import {
+  getConversations,
+  subscribeToUserConversations,
+} from "@/services/conversations";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { colors } from "@/theme/colors";
@@ -29,6 +32,7 @@ export default function ChatsScreen() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let hasLoadedCache = false;
@@ -52,6 +56,27 @@ export default function ChatsScreen() {
     loadConversations();
   }, [user]);
 
+  // Subscribe to real-time unread count updates
+  useEffect(() => {
+    if (!user) return;
+
+    console.log(
+      `📡 Setting up real-time unread count subscription for user ${user.id}`
+    );
+
+    const unsubscribe = subscribeToUserConversations(
+      user.id,
+      (updatedCounts) => {
+        setUnreadCounts(updatedCounts);
+      }
+    );
+
+    return () => {
+      console.log("🔌 Unsubscribing from unread count updates");
+      unsubscribe();
+    };
+  }, [user]);
+
   const loadConversations = async () => {
     if (!user) return;
 
@@ -62,6 +87,8 @@ export default function ChatsScreen() {
       setConversations(result.data);
       // Cache the conversations
       await cacheConversations(result.data);
+
+      // Note: Unread counts are handled by real-time subscription
     } else {
       setError(result.error || "Failed to load conversations");
     }
@@ -85,7 +112,7 @@ export default function ChatsScreen() {
       <ConversationListItem
         conversation={item}
         currentUserId={user.id}
-        unreadCount={0} // TODO: Get from userConversations
+        unreadCount={unreadCounts[item.id] || 0}
       />
     );
   };

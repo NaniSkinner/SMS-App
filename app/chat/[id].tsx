@@ -17,7 +17,13 @@ import {
   sendMessage,
   subscribeToMessages,
 } from "@/services/chat";
-import { updateLastMessage } from "@/services/conversations";
+import { resetUnreadCount, updateLastMessage } from "@/services/conversations";
+import { subscribeToUserPresence } from "@/services/presence";
+import {
+  clearUserTyping,
+  setUserTyping,
+  subscribeToTypingStatus,
+} from "@/services/typing";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -53,10 +59,19 @@ export default function ChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [otherUserOnline, setOtherUserOnline] = useState(false);
+  const [otherUserLastSeen, setOtherUserLastSeen] = useState<Date | null>(null);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
   const conversationMessages = messages[conversationId] || [];
+
+  // Get other user ID for direct conversations
+  const otherUserId =
+    conversation?.type === "direct"
+      ? conversation.participants.find((id) => id !== user?.id)
+      : null;
 
   useEffect(() => {
     if (!conversationId || !user) return;
@@ -81,27 +96,61 @@ export default function ChatScreen() {
     // Mark messages as read when viewing the conversation
     markMessagesAsRead(conversationId, user.id);
 
+    // Reset unread count
+    resetUnreadCount(user.id, conversationId);
+
     // Subscribe to real-time messages
-    const unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
-      setMessages(conversationId, newMessages);
-      setIsLoadingMessages(false);
+    const unsubscribeMessages = subscribeToMessages(
+      conversationId,
+      (newMessages) => {
+        setMessages(conversationId, newMessages);
+        setIsLoadingMessages(false);
 
-      // Cache the new messages
-      cacheMessages(conversationId, newMessages);
+        // Cache the new messages
+        cacheMessages(conversationId, newMessages);
 
-      // Mark new messages as delivered and read when they arrive
-      setTimeout(() => {
-        markMessagesAsDelivered(conversationId, user.id);
-        markMessagesAsRead(conversationId, user.id);
-      }, 500);
-    });
+        // Mark new messages as delivered and read when they arrive
+        setTimeout(() => {
+          markMessagesAsDelivered(conversationId, user.id);
+          markMessagesAsRead(conversationId, user.id);
+          resetUnreadCount(user.id, conversationId);
+        }, 500);
+      }
+    );
+
+    // Subscribe to other user's presence (for direct conversations)
+    let unsubscribePresence: (() => void) | undefined;
+    if (otherUserId) {
+      unsubscribePresence = subscribeToUserPresence(
+        otherUserId,
+        (online, lastSeen) => {
+          setOtherUserOnline(online);
+          setOtherUserLastSeen(lastSeen);
+        }
+      );
+    }
+
+    // Subscribe to typing status
+    const unsubscribeTyping = subscribeToTypingStatus(
+      conversationId,
+      user.id,
+      (typingNames) => {
+        setTypingUsers(typingNames);
+      }
+    );
 
     // Cleanup
     return () => {
-      unsubscribe();
+      unsubscribeMessages();
+      if (unsubscribePresence) {
+        unsubscribePresence();
+      }
+      unsubscribeTyping();
+      // Clear own typing status on unmount
+      clearUserTyping(conversationId, user.id);
       setActiveConversation(null);
     };
-  }, [conversationId, user]);
+  }, [conversationId, user, otherUserId]);
 
   const handleSendMessage = async (text: string) => {
     if (!user || !conversation) return;
@@ -230,25 +279,23 @@ export default function ChatScreen() {
     }
   };
 
-  // Get header info
+  // Get header info with real-time presence
   const getHeaderInfo = () => {
     if (!conversation) return { title: "Chat", subtitle: "" };
 
     if (conversation.type === "direct") {
-      const otherUserId = conversation.participants.find(
-        (id) => id !== user?.id
-      );
-      if (otherUserId) {
-        const otherUser = conversation.participantDetails[otherUserId];
-        return {
-          title: otherUser?.displayName || "Unknown User",
-          subtitle: otherUser?.isOnline
-            ? "Online"
-            : otherUser?.lastSeen
-            ? `Last seen ${formatLastSeen(otherUser.lastSeen)}`
-            : "Offline",
-        };
-      }
+      const otherUser = otherUserId
+        ? conversation.participantDetails[otherUserId]
+        : null;
+
+      return {
+        title: otherUser?.displayName || "Unknown User",
+        subtitle: otherUserOnline
+          ? "Online"
+          : otherUserLastSeen
+          ? `Last seen ${formatLastSeen(otherUserLastSeen)}`
+          : "Offline",
+      };
     } else {
       const memberCount = conversation.participants.length;
       return {
@@ -256,8 +303,6 @@ export default function ChatScreen() {
         subtitle: `${memberCount} members`,
       };
     }
-
-    return { title: "Chat", subtitle: "" };
   };
 
   const formatLastSeen = (date: Date): string => {
@@ -277,6 +322,29 @@ export default function ChatScreen() {
       month: "short",
       day: "numeric",
     });
+  };
+
+  // Handle typing start
+  const handleTypingStart = () => {
+    if (user) {
+      setUserTyping(conversationId, user.id, user.displayName);
+    }
+  };
+
+  // Handle typing stop
+  const handleTypingStop = () => {
+    if (user) {
+      clearUserTyping(conversationId, user.id);
+    }
+  };
+
+  // Format typing indicator text
+  const getTypingText = (): string => {
+    if (typingUsers.length === 0) return "";
+    if (typingUsers.length === 1) return `${typingUsers[0]} is typing...`;
+    if (typingUsers.length === 2)
+      return `${typingUsers[0]} and ${typingUsers[1]} are typing...`;
+    return `${typingUsers.length} people are typing...`;
   };
 
   const headerInfo = getHeaderInfo();
@@ -329,10 +397,22 @@ export default function ChatScreen() {
             onRetry={handleRetryMessage}
           />
         )}
+
+        {/* Typing Indicator */}
+        {typingUsers.length > 0 && (
+          <View style={styles.typingIndicator}>
+            <Text style={styles.typingText}>{getTypingText()}</Text>
+          </View>
+        )}
       </View>
 
       {/* Input */}
-      <MessageInput onSend={handleSendMessage} isSending={isSending} />
+      <MessageInput
+        onSend={handleSendMessage}
+        isSending={isSending}
+        onTypingStart={handleTypingStart}
+        onTypingStop={handleTypingStop}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -396,5 +476,15 @@ const styles = StyleSheet.create({
   },
   messagesContainer: {
     flex: 1,
+  },
+  typingIndicator: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: colors.light.background,
+  },
+  typingText: {
+    fontSize: 13,
+    color: colors.light.textSecondary,
+    fontStyle: "italic",
   },
 });
