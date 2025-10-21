@@ -458,6 +458,35 @@ Total Progress: 46/83 tasks (55%)
 - Retry logic for failed messages
 - Network status monitoring and offline banner
 
+### Day 3 Bug Fixes & Additional Work:
+
+- [x] **UUID Polyfill Issue** - Fixed "Native module not found" error
+  - Created custom `index.js` entry point
+  - Imported `react-native-get-random-values` polyfill before all other code
+  - Updated `package.json` main entry to use `index.js`
+  - Ensures crypto.getRandomValues() available for uuid library
+
+- [x] **React Key Errors** - Fixed duplicate key warnings in lists
+  - Updated conversation list keyExtractor to use `${item.id}-${index}`
+  - Updated message list keyExtractor to prioritize `localId` over `id`
+  - Prevents React duplicate children errors during cache/real-time sync
+
+- [x] **Read Status Visibility** - Improved read receipt visibility
+  - Changed read status checkmark color from blue (#4FC3F7) to green (#4ADE80)
+  - Better contrast on blue message bubbles
+  - Easier to distinguish read vs delivered status
+
+- [x] **Testing Configuration** - Set up dual simulator testing
+  - Configured iPhone 17 Pro and iPhone 16 Pro for simultaneous testing
+  - Verified real-time messaging between two users
+  - Confirmed optimistic UI works on both devices
+
+**Known Issues Resolved:**
+- ✅ App cache persistence across reloads
+- ✅ Polyfill loading order for React Native
+- ✅ Duplicate message rendering during sync
+- ✅ Status indicator visibility on colored backgrounds
+
 ---
 
 ## Day 4: Presence & Receipts (Thursday)
