@@ -18,6 +18,7 @@ import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -33,6 +34,7 @@ export default function ChatsScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
+  const [showNewChatMenu, setShowNewChatMenu] = useState(false);
 
   useEffect(() => {
     let hasLoadedCache = false;
@@ -103,7 +105,17 @@ export default function ChatsScreen() {
   }, [user]);
 
   const handleNewChat = () => {
+    setShowNewChatMenu(true);
+  };
+
+  const handleNewMessage = () => {
+    setShowNewChatMenu(false);
     router.push("/users");
+  };
+
+  const handleCreateGroup = () => {
+    setShowNewChatMenu(false);
+    router.push("/group/create" as any);
   };
 
   const renderConversationItem = ({ item }: { item: Conversation }) => {
@@ -168,6 +180,64 @@ export default function ChatsScreen() {
       >
         <Text style={styles.fabText}>+</Text>
       </Pressable>
+
+      {/* New Chat Menu Modal */}
+      <Modal
+        visible={showNewChatMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowNewChatMenu(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowNewChatMenu(false)}
+        >
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>New Conversation</Text>
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuOption,
+                pressed && styles.menuOptionPressed,
+              ]}
+              onPress={handleNewMessage}
+            >
+              <Text style={styles.menuOptionIcon}>💬</Text>
+              <View style={styles.menuOptionText}>
+                <Text style={styles.menuOptionTitle}>New Message</Text>
+                <Text style={styles.menuOptionSubtitle}>
+                  Start a direct conversation
+                </Text>
+              </View>
+            </Pressable>
+
+            <View style={styles.menuDivider} />
+
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuOption,
+                pressed && styles.menuOptionPressed,
+              ]}
+              onPress={handleCreateGroup}
+            >
+              <Text style={styles.menuOptionIcon}>👥</Text>
+              <View style={styles.menuOptionText}>
+                <Text style={styles.menuOptionTitle}>Create Group</Text>
+                <Text style={styles.menuOptionSubtitle}>
+                  Chat with multiple people
+                </Text>
+              </View>
+            </Pressable>
+
+            <Pressable
+              style={styles.modalCancelButton}
+              onPress={() => setShowNewChatMenu(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -260,5 +330,77 @@ const styles = StyleSheet.create({
     fontWeight: "300",
     color: "#FFFFFF",
     lineHeight: 36,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: colors.light.background,
+    borderRadius: 12,
+    padding: 20,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: colors.light.textPrimary,
+    marginBottom: 16,
+    textAlign: "center",
+  },
+  menuOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 8,
+  },
+  menuOptionPressed: {
+    backgroundColor: colors.light.inputBackground,
+  },
+  menuOptionIcon: {
+    fontSize: 32,
+    marginRight: 16,
+  },
+  menuOptionText: {
+    flex: 1,
+  },
+  menuOptionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.light.textPrimary,
+    marginBottom: 4,
+  },
+  menuOptionSubtitle: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: colors.light.border,
+    marginVertical: 8,
+  },
+  modalCancelButton: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: colors.light.inputBackground,
+  },
+  modalCancelText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.light.textSecondary,
+    textAlign: "center",
   },
 });

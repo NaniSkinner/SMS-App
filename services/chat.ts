@@ -25,6 +25,30 @@ import { v4 as uuidv4 } from "uuid";
 import { db } from "./firebase.config";
 
 /**
+ * Helper function to safely convert timestamps to Date objects
+ * Handles Firestore Timestamps, Date objects, strings, and null
+ */
+function convertToDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+
+  if (typeof timestamp.toDate === "function") {
+    // It's a Firestore Timestamp
+    return timestamp.toDate();
+  } else if (timestamp instanceof Date) {
+    // It's already a Date
+    return timestamp;
+  } else if (typeof timestamp === "string") {
+    // It's a string (from JSON serialization)
+    return new Date(timestamp);
+  } else if (typeof timestamp === "number") {
+    // It's a timestamp number
+    return new Date(timestamp);
+  }
+
+  return null;
+}
+
+/**
  * Get all messages for a conversation
  */
 export const getMessages = async (
@@ -47,10 +71,10 @@ export const getMessages = async (
         conversationId,
         senderId: data.senderId,
         text: data.text,
-        timestamp: data.timestamp?.toDate() || new Date(),
+        timestamp: convertToDate(data.timestamp) || new Date(),
         status: data.status as MessageStatus,
         readBy: data.readBy || [],
-        createdAt: data.createdAt?.toDate() || new Date(),
+        createdAt: convertToDate(data.createdAt) || new Date(),
       };
     });
 
@@ -186,10 +210,10 @@ export const subscribeToMessages = (
           conversationId,
           senderId: data.senderId,
           text: data.text,
-          timestamp: data.timestamp?.toDate() || new Date(),
+          timestamp: convertToDate(data.timestamp) || new Date(),
           status: data.status as MessageStatus,
           readBy: data.readBy || [],
-          createdAt: data.createdAt?.toDate() || new Date(),
+          createdAt: convertToDate(data.createdAt) || new Date(),
         };
       });
 

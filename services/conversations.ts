@@ -61,13 +61,14 @@ export const getOrCreateConversation = async (
           lastMessage: data.lastMessage
             ? {
                 text: data.lastMessage.text,
-                timestamp: data.lastMessage.timestamp?.toDate() || new Date(),
+                timestamp:
+                  convertToDate(data.lastMessage.timestamp) || new Date(),
                 senderId: data.lastMessage.senderId,
                 senderName: data.lastMessage.senderName,
               }
             : undefined,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
+          createdAt: convertToDate(data.createdAt) || new Date(),
+          updatedAt: convertToDate(data.updatedAt) || new Date(),
         };
 
         return {
@@ -114,7 +115,7 @@ export const createConversation = async (
       if (result.success && result.data) {
         participantDetails[userId] = {
           displayName: result.data.displayName,
-          photoURL: result.data.photoURL, // Can be undefined
+          photoURL: result.data.photoURL,
           isOnline: result.data.isOnline,
           lastSeen: result.data.lastSeen,
         };
@@ -124,10 +125,22 @@ export const createConversation = async (
     const conversationType: ConversationType =
       participantIds.length === 2 ? "direct" : "group";
 
+    // Clean undefined values from participantDetails for Firestore
+    const cleanedParticipantDetails: any = {};
+    for (const userId in participantDetails) {
+      const detail = participantDetails[userId];
+      cleanedParticipantDetails[userId] = {
+        displayName: detail.displayName,
+        photoURL: detail.photoURL ?? null, // Convert undefined to null
+        isOnline: detail.isOnline,
+        lastSeen: detail.lastSeen ?? null, // Convert undefined to null
+      };
+    }
+
     const conversationData = {
       type: conversationType,
       participants: participantIds,
-      participantDetails,
+      participantDetails: cleanedParticipantDetails,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       ...(conversationType === "group" && {
@@ -195,6 +208,91 @@ export const createConversation = async (
     return {
       success: false,
       error: "Failed to create conversation.",
+    };
+  }
+};
+
+/**
+ * Create a group conversation
+ * Wrapper around createConversation for groups
+ */
+export const createGroupConversation = async (
+  participantIds: string[],
+  groupName: string,
+  creatorId: string
+): Promise<ApiResponse<Conversation>> => {
+  try {
+    if (participantIds.length < 3) {
+      return {
+        success: false,
+        error:
+          "At least 3 participants are required for a group (including creator).",
+      };
+    }
+
+    // Create the group conversation
+    const result = await createConversation(
+      participantIds,
+      groupName,
+      creatorId
+    );
+
+    if (!result.success || !result.data) {
+      return result;
+    }
+
+    // Send system message for group creation
+    const creatorResult = await getUserProfile(creatorId);
+    const creatorName = creatorResult.data?.displayName || "Someone";
+
+    await sendSystemMessage(result.data.id, `${creatorName} created the group`);
+
+    return result;
+  } catch (error: any) {
+    console.error("❌ Error creating group conversation:", error);
+    return {
+      success: false,
+      error: "Failed to create group.",
+    };
+  }
+};
+
+/**
+ * Send a system message to a conversation
+ */
+export const sendSystemMessage = async (
+  conversationId: string,
+  text: string
+): Promise<ApiResponse<void>> => {
+  try {
+    const messagesRef = collection(
+      db,
+      "conversations",
+      conversationId,
+      "messages"
+    );
+
+    const systemMessage = {
+      conversationId,
+      senderId: "system",
+      text,
+      timestamp: serverTimestamp(),
+      status: "sent",
+      readBy: [],
+      createdAt: serverTimestamp(),
+    };
+
+    await addDoc(messagesRef, systemMessage);
+    console.log(`✅ System message sent to conversation ${conversationId}`);
+
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error("❌ Error sending system message:", error);
+    return {
+      success: false,
+      error: "Failed to send system message.",
     };
   }
 };
@@ -317,13 +415,14 @@ export const getConversations = async (
           lastMessage: data.lastMessage
             ? {
                 text: data.lastMessage.text,
-                timestamp: data.lastMessage.timestamp?.toDate() || new Date(),
+                timestamp:
+                  convertToDate(data.lastMessage.timestamp) || new Date(),
                 senderId: data.lastMessage.senderId,
                 senderName: data.lastMessage.senderName,
               }
             : undefined,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          updatedAt: data.updatedAt?.toDate() || new Date(),
+          createdAt: convertToDate(data.createdAt) || new Date(),
+          updatedAt: convertToDate(data.updatedAt) || new Date(),
           groupName: data.groupName,
           groupPhoto: data.groupPhoto,
           createdBy: data.createdBy,
@@ -508,6 +607,30 @@ export const subscribeToUserConversations = (
 };
 
 /**
+ * Helper function to safely convert timestamps to Date objects
+ * Handles Firestore Timestamps, Date objects, strings, and null
+ */
+function convertToDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+
+  if (typeof timestamp.toDate === "function") {
+    // It's a Firestore Timestamp
+    return timestamp.toDate();
+  } else if (timestamp instanceof Date) {
+    // It's already a Date
+    return timestamp;
+  } else if (typeof timestamp === "string") {
+    // It's a string (from JSON serialization)
+    return new Date(timestamp);
+  } else if (typeof timestamp === "number") {
+    // It's a timestamp number
+    return new Date(timestamp);
+  }
+
+  return null;
+}
+
+/**
  * Helper function to convert participant details from Firestore format
  */
 function convertParticipantDetails(
@@ -517,11 +640,12 @@ function convertParticipantDetails(
 
   for (const userId in participantDetails) {
     const detail = participantDetails[userId];
+
     converted[userId] = {
       displayName: detail.displayName,
       photoURL: detail.photoURL,
       isOnline: detail.isOnline,
-      lastSeen: detail.lastSeen?.toDate() || null,
+      lastSeen: convertToDate(detail.lastSeen),
     };
   }
 

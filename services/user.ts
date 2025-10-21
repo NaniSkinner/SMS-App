@@ -16,6 +16,30 @@ import {
 import { db } from "./firebase.config";
 
 /**
+ * Helper function to safely convert timestamps to Date objects
+ * Handles Firestore Timestamps, Date objects, strings, and null
+ */
+function convertToDate(timestamp: any): Date | null {
+  if (!timestamp) return null;
+
+  if (typeof timestamp.toDate === "function") {
+    // It's a Firestore Timestamp
+    return timestamp.toDate();
+  } else if (timestamp instanceof Date) {
+    // It's already a Date
+    return timestamp;
+  } else if (typeof timestamp === "string") {
+    // It's a string (from JSON serialization)
+    return new Date(timestamp);
+  } else if (typeof timestamp === "number") {
+    // It's a timestamp number
+    return new Date(timestamp);
+  }
+
+  return null;
+}
+
+/**
  * Create a new user profile document in Firestore
  */
 export const createUserProfile = async (
@@ -94,8 +118,8 @@ export const getUserProfile = async (
       displayName: data.displayName,
       photoURL: data.photoURL || undefined,
       isOnline: data.isOnline,
-      lastSeen: data.lastSeen?.toDate() || null,
-      createdAt: data.createdAt?.toDate() || new Date(),
+      lastSeen: convertToDate(data.lastSeen),
+      createdAt: convertToDate(data.createdAt) || new Date(),
       pushToken: data.pushToken || undefined,
       theme: data.theme || "system",
     };
@@ -195,8 +219,8 @@ export const getAllUsers = async (
         displayName: data.displayName,
         photoURL: data.photoURL || undefined,
         isOnline: data.isOnline,
-        lastSeen: data.lastSeen?.toDate() || null,
-        createdAt: data.createdAt?.toDate() || new Date(),
+        lastSeen: convertToDate(data.lastSeen),
+        createdAt: convertToDate(data.createdAt) || new Date(),
         pushToken: data.pushToken || undefined,
         theme: data.theme || "system",
       });

@@ -21,6 +21,7 @@ interface MessageListProps {
   conversation: Conversation;
   isLoading?: boolean;
   onRetry?: (message: Message) => void;
+  onReadStatusPress?: (message: Message) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -29,6 +30,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   conversation,
   isLoading = false,
   onRetry,
+  onReadStatusPress,
 }) => {
   const flatListRef = useRef<FlatList>(null);
 
@@ -90,18 +92,17 @@ export const MessageList: React.FC<MessageListProps> = ({
     const previousMessage = index > 0 ? messages[index - 1] : undefined;
     const showDateSeparator = shouldShowDateSeparator(item, previousMessage);
 
-    // Get sender details for group messages
+    // Get sender details for group messages (for all messages in groups, not just received)
     const senderDetails =
-      conversation.type === "group" && !isOwnMessage
+      conversation.type === "group"
         ? conversation.participantDetails[item.senderId]
         : undefined;
 
-    // Show avatar for the last message in a group from each sender
+    // Show avatar for the last message in a group from each sender (including own messages)
     const nextMessage =
       index < messages.length - 1 ? messages[index + 1] : undefined;
     const showAvatar =
       conversation.type === "group" &&
-      !isOwnMessage &&
       (!nextMessage || nextMessage.senderId !== item.senderId);
 
     return (
@@ -120,6 +121,9 @@ export const MessageList: React.FC<MessageListProps> = ({
           senderName={senderDetails?.displayName}
           senderPhotoURL={senderDetails?.photoURL}
           onRetry={onRetry}
+          isGroupChat={conversation.type === "group"}
+          totalParticipants={conversation.participants.length}
+          onReadStatusPress={onReadStatusPress}
         />
       </View>
     );

@@ -16,6 +16,9 @@ interface MessageBubbleProps {
   senderName?: string;
   senderPhotoURL?: string;
   onRetry?: (message: Message) => void;
+  isGroupChat?: boolean;
+  totalParticipants?: number;
+  onReadStatusPress?: (message: Message) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -25,7 +28,19 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   senderName,
   senderPhotoURL,
   onRetry,
+  isGroupChat = false,
+  totalParticipants = 0,
+  onReadStatusPress,
 }) => {
+  // Check if this is a system message
+  const isSystemMessage = message.senderId === "system";
+
+  // For group chats, determine if all members have read
+  const allMembersRead =
+    isGroupChat && totalParticipants > 0
+      ? message.readBy.length >= totalParticipants
+      : false;
+
   // Format timestamp
   const formatTime = (date: Date): string => {
     const hours = date.getHours();
@@ -54,6 +69,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
+  // Render system message
+  if (isSystemMessage) {
+    return (
+      <View style={styles.systemMessageContainer}>
+        <View style={styles.systemMessageBubble}>
+          <Text style={styles.systemMessageText}>{message.text}</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
@@ -61,7 +87,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         isOwnMessage ? styles.containerOwn : styles.containerOther,
       ]}
     >
-      {/* Avatar for received messages */}
+      {/* Avatar for received group messages */}
       {!isOwnMessage && showAvatar && (
         <View style={styles.avatarContainer}>
           <Avatar
@@ -72,8 +98,10 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         </View>
       )}
 
-      {/* Spacer when no avatar needed */}
-      {!isOwnMessage && !showAvatar && <View style={styles.avatarSpacer} />}
+      {/* Spacer when no avatar needed in groups (left side) */}
+      {!isOwnMessage && isGroupChat && !showAvatar && (
+        <View style={styles.avatarSpacer} />
+      )}
 
       <View
         style={[
@@ -81,9 +109,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           isOwnMessage && styles.bubbleContainerOwn,
         ]}
       >
-        {/* Sender name for group messages */}
-        {!isOwnMessage && senderName && (
-          <Text style={styles.senderName}>{senderName}</Text>
+        {/* Sender name for group messages (all messages) */}
+        {isGroupChat && senderName && (
+          <Text
+            style={[styles.senderName, isOwnMessage && styles.senderNameOwn]}
+          >
+            {senderName}
+          </Text>
         )}
 
         {/* Message bubble */}
@@ -104,7 +136,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
 
           {/* Timestamp and status */}
-          <View style={styles.metaContainer}>
+          <Pressable
+            style={styles.metaContainer}
+            onPress={() => {
+              if (isGroupChat && isOwnMessage && onReadStatusPress) {
+                onReadStatusPress(message);
+              }
+            }}
+            disabled={!isGroupChat || !isOwnMessage || !onReadStatusPress}
+          >
             <Text
               style={[
                 styles.timestamp,
@@ -118,14 +158,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               <Text
                 style={[
                   styles.statusIcon,
-                  message.status === "read" && styles.statusIconRead,
+                  (message.status === "read" || allMembersRead) &&
+                    styles.statusIconRead,
                   message.status === "failed" && styles.statusIconFailed,
                 ]}
               >
                 {getStatusIcon()}
               </Text>
             )}
-          </View>
+          </Pressable>
         </View>
 
         {/* Failed message indicator with retry button */}
@@ -141,6 +182,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Pressable>
         )}
       </View>
+
+      {/* Avatar for own group messages (right side) */}
+      {isOwnMessage && showAvatar && (
+        <View style={styles.avatarContainerOwn}>
+          <Avatar
+            displayName={senderName || "User"}
+            photoURL={senderPhotoURL}
+            size={32}
+          />
+        </View>
+      )}
+
+      {/* Spacer when no avatar needed in groups (right side) */}
+      {isOwnMessage && isGroupChat && !showAvatar && (
+        <View style={styles.avatarSpacer} />
+      )}
     </View>
   );
 };
@@ -161,6 +218,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
     alignSelf: "flex-end",
   },
+  avatarContainerOwn: {
+    marginRight: 0,
+    marginLeft: 8,
+  },
   avatarSpacer: {
     width: 40,
   },
@@ -176,6 +237,11 @@ const styles = StyleSheet.create({
     color: colors.light.textSecondary,
     marginBottom: 2,
     marginLeft: 12,
+  },
+  senderNameOwn: {
+    marginLeft: 0,
+    marginRight: 12,
+    textAlign: "right",
   },
   bubble: {
     paddingHorizontal: 12,
@@ -253,5 +319,22 @@ const styles = StyleSheet.create({
   },
   retryButtonPressed: {
     opacity: 0.7,
+  },
+  systemMessageContainer: {
+    alignItems: "center",
+    marginVertical: 8,
+    paddingHorizontal: 12,
+  },
+  systemMessageBubble: {
+    backgroundColor: colors.light.inputBackground,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  systemMessageText: {
+    fontSize: 13,
+    color: colors.light.textSecondary,
+    textAlign: "center",
+    fontStyle: "italic",
   },
 });

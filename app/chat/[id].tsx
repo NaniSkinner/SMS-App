@@ -5,6 +5,7 @@
 
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
+import { Avatar } from "@/components/common/Avatar";
 import {
   addToOfflineQueue,
   cacheMessages,
@@ -33,7 +34,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  FlatList,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -62,6 +65,8 @@ export default function ChatScreen() {
   const [otherUserOnline, setOtherUserOnline] = useState(false);
   const [otherUserLastSeen, setOtherUserLastSeen] = useState<Date | null>(null);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
+  const [showReadStatusModal, setShowReadStatusModal] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -347,6 +352,12 @@ export default function ChatScreen() {
     return `${typingUsers.length} people are typing...`;
   };
 
+  // Handle read status press
+  const handleReadStatusPress = (message: Message) => {
+    setSelectedMessage(message);
+    setShowReadStatusModal(true);
+  };
+
   const headerInfo = getHeaderInfo();
 
   if (!conversation) {
@@ -369,14 +380,22 @@ export default function ChatScreen() {
         <Pressable onPress={() => router.back()} style={styles.backButton}>
           <Text style={styles.backButtonText}>←</Text>
         </Pressable>
-        <View style={styles.headerInfo}>
+        <Pressable
+          style={styles.headerInfo}
+          onPress={() => {
+            if (conversation?.type === "group") {
+              router.push(`/group/${conversationId}/info` as any);
+            }
+          }}
+          disabled={conversation?.type !== "group"}
+        >
           <Text style={styles.headerTitle} numberOfLines={1}>
             {headerInfo.title}
           </Text>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {headerInfo.subtitle}
           </Text>
-        </View>
+        </Pressable>
       </View>
 
       {/* Error Banner */}
@@ -395,6 +414,7 @@ export default function ChatScreen() {
             conversation={conversation}
             isLoading={isLoadingMessages}
             onRetry={handleRetryMessage}
+            onReadStatusPress={handleReadStatusPress}
           />
         )}
 
@@ -413,6 +433,64 @@ export default function ChatScreen() {
         onTypingStart={handleTypingStart}
         onTypingStop={handleTypingStop}
       />
+
+      {/* Read Status Modal */}
+      {conversation?.type === "group" && selectedMessage && (
+        <Modal
+          visible={showReadStatusModal}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setShowReadStatusModal(false)}
+        >
+          <Pressable
+            style={styles.modalOverlay}
+            onPress={() => setShowReadStatusModal(false)}
+          >
+            <View style={styles.modalContent}>
+              <Text style={styles.modalTitle}>Read By</Text>
+
+              <FlatList
+                data={selectedMessage.readBy
+                  .map((userId) => conversation.participantDetails[userId])
+                  .filter((user) => user)}
+                renderItem={({ item }) => (
+                  <View style={styles.readStatusItem}>
+                    <Avatar
+                      displayName={item.displayName}
+                      photoURL={item.photoURL}
+                      size={40}
+                      showOnlineIndicator
+                      isOnline={item.isOnline}
+                    />
+                    <View style={styles.readStatusInfo}>
+                      <Text style={styles.readStatusName}>
+                        {item.displayName}
+                      </Text>
+                      <Text style={styles.readStatusText}>Read</Text>
+                    </View>
+                  </View>
+                )}
+                keyExtractor={(item) => item.displayName}
+                contentContainerStyle={styles.modalList}
+                ListEmptyComponent={
+                  <View style={styles.emptyReadStatus}>
+                    <Text style={styles.emptyReadStatusText}>
+                      No one has read this message yet
+                    </Text>
+                  </View>
+                }
+              />
+
+              <Pressable
+                style={styles.modalCloseButton}
+                onPress={() => setShowReadStatusModal(false)}
+              >
+                <Text style={styles.modalCloseText}>Close</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Modal>
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -486,5 +564,71 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.light.textSecondary,
     fontStyle: "italic",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.light.background,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: "70%",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.light.textPrimary,
+    textAlign: "center",
+    marginBottom: 16,
+    paddingHorizontal: 20,
+  },
+  modalList: {
+    paddingHorizontal: 20,
+  },
+  readStatusItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  readStatusInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  readStatusName: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.light.textPrimary,
+    marginBottom: 2,
+  },
+  readStatusText: {
+    fontSize: 13,
+    color: colors.success,
+  },
+  emptyReadStatus: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  emptyReadStatusText: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+  },
+  modalCloseButton: {
+    marginTop: 20,
+    marginHorizontal: 20,
+    padding: 16,
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  modalCloseText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });
