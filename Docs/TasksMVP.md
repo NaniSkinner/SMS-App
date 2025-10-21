@@ -1,13 +1,13 @@
 Day 0: Setup & Configuration [■■■■■■■■] 8/8 tasks ✅ COMPLETE
 Day 1: Foundation & Auth [■■■■■■■■■■■■] 12/12 tasks ✅ COMPLETE  
-Day 2: Core Messaging [ ] 0/15 tasks
+Day 2: Core Messaging [■■■■■■■■■■■■■■■] 15/15 tasks ✅ COMPLETE
 Day 3: Reliability [ ] 0/11 tasks
 Day 4: Presence & Receipts [ ] 0/9 tasks
 Day 5: Group Chat [ ] 0/10 tasks
 Day 6: Push Notifications [ ] 0/8 tasks
 Day 7: Polish & Deploy [ ] 0/10 tasks
 
-Total Progress: 20/83 tasks (24%)
+Total Progress: 35/83 tasks (42%)
 
 ```
 
@@ -176,127 +176,161 @@ Total Progress: 20/83 tasks (24%)
 **Time:** 8-10 hours
 
 ### 2.1 Chat Store Setup (1 hour)
-- [ ] **Create Chat Store**
-  - [ ] Create `stores/chatStore.ts`
-  - [ ] Add state: `conversations`, `activeConversationId`
-  - [ ] Add actions: `setConversations`, `addMessage`, `updateMessageStatus`
-  - [ ] Add action: `setActiveConversation`
-  - [ ] Test store with mock data
+- [x] **Create Chat Store**
+  - [x] Create `stores/chatStore.ts`
+  - [x] Add state: `conversations`, `activeConversationId`
+  - [x] Add actions: `setConversations`, `addMessage`, `updateMessageStatus`
+  - [x] Add action: `setActiveConversation`
+  - [x] Test store with mock data
 
 ### 2.2 Chat Service (1.5 hours)
-- [ ] **Create Chat Service**
-  - [ ] Create `services/chat.ts`
-  - [ ] Implement `getConversations(userId)`
-  - [ ] Implement `getMessages(conversationId)`
-  - [ ] Implement `sendMessage(conversationId, text, senderId)`
-  - [ ] Implement `subscribeToMessages(conversationId, callback)`
-  - [ ] Add error handling
-  - [ ] Test each function
+- [x] **Create Chat Service**
+  - [x] Create `services/chat.ts`
+  - [x] Implement `getConversations(userId)`
+  - [x] Implement `getMessages(conversationId)`
+  - [x] Implement `sendMessage(conversationId, text, senderId)`
+  - [x] Implement `subscribeToMessages(conversationId, callback)`
+  - [x] Add error handling
+  - [x] Test each function
 
 ### 2.3 Conversation Service (1 hour)
-- [ ] **Conversation Management**
-  - [ ] Create `services/conversations.ts`
-  - [ ] Implement `createConversation(participantIds)`
-  - [ ] Implement `getOrCreateConversation(userId1, userId2)`
-  - [ ] Implement `updateLastMessage(conversationId, message)`
-  - [ ] Test conversation creation
+- [x] **Conversation Management**
+  - [x] Create `services/conversations.ts`
+  - [x] Implement `createConversation(participantIds)`
+  - [x] Implement `getOrCreateConversation(userId1, userId2)`
+  - [x] Implement `updateLastMessage(conversationId, message)`
+  - [x] Test conversation creation
 
 ### 2.4 Chat List Screen (2 hours)
-- [ ] **Build Chat List UI**
-  - [ ] Create `app/(tabs)/chats.tsx`
-  - [ ] Fetch user's conversations from Firestore
-  - [ ] Display conversations in FlatList
-  - [ ] Show last message preview
-  - [ ] Show timestamp
-  - [ ] Show unread count (placeholder for now)
-  - [ ] Add pull-to-refresh
-  - [ ] Add empty state ("No conversations yet")
-  - [ ] Navigate to chat screen on tap
+- [x] **Build Chat List UI**
+  - [x] Create `app/(tabs)/chats.tsx`
+  - [x] Fetch user's conversations from Firestore
+  - [x] Display conversations in FlatList
+  - [x] Show last message preview
+  - [x] Show timestamp
+  - [x] Show unread count (placeholder for now)
+  - [x] Add pull-to-refresh
+  - [x] Add empty state ("No conversations yet")
+  - [x] Navigate to chat screen on tap
+  - [x] Add "New Chat" button (FAB)
 
 ### 2.5 Conversation List Item Component (1 hour)
-- [ ] **Create ConversationListItem**
-  - [ ] Create `components/conversation/ConversationListItem.tsx`
-  - [ ] Display user avatar (square with rounded corners, 48x48)
-  - [ ] Display user name (bold if unread)
-  - [ ] Display last message preview (truncated)
-  - [ ] Display timestamp (formatted)
-  - [ ] Display unread badge
-  - [ ] Display online indicator (green dot)
-  - [ ] Add press handler
-  - [ ] Test with different states
+- [x] **Create ConversationListItem**
+  - [x] Create `components/conversation/ConversationListItem.tsx`
+  - [x] Display user avatar (square with rounded corners, 48x48)
+  - [x] Display user name (bold if unread)
+  - [x] Display last message preview (truncated)
+  - [x] Display timestamp (formatted)
+  - [x] Display unread badge
+  - [x] Display online indicator (green dot)
+  - [x] Add press handler
+  - [x] Test with different states
 
 ### 2.6 Avatar Component (30 mins)
-- [ ] **Create Avatar Component**
-  - [ ] Create `components/common/Avatar.tsx`
-  - [ ] Square shape with borderRadius: 8
-  - [ ] Size: 48x48 (default), accept size prop
-  - [ ] Show image if photoURL provided
-  - [ ] Show initials if no image
-  - [ ] Add online indicator prop
-  - [ ] Style for light/dark theme
+- [x] **Create Avatar Component**
+  - [x] Create `components/common/Avatar.tsx`
+  - [x] Square shape with borderRadius: 8
+  - [x] Size: 48x48 (default), accept size prop
+  - [x] Show image if photoURL provided
+  - [x] Show initials if no image
+  - [x] Add online indicator prop
+  - [x] Style for light/dark theme
 
 ### 2.7 Chat Screen UI (2 hours)
-- [ ] **Build Chat Screen**
-  - [ ] Create `app/chat/[id].tsx`
-  - [ ] Add header with user name and back button
-  - [ ] Add online/offline status in header
-  - [ ] Create message list area
-  - [ ] Create message input area
-  - [ ] Style layout properly
-  - [ ] Test navigation from chat list
+- [x] **Build Chat Screen**
+  - [x] Create `app/chat/[id].tsx`
+  - [x] Add header with user name and back button
+  - [x] Add online/offline status in header
+  - [x] Create message list area
+  - [x] Create message input area
+  - [x] Style layout properly
+  - [x] Test navigation from chat list
 
 ### 2.8 Message List Component (1.5 hours)
-- [ ] **Create MessageList**
-  - [ ] Create `components/chat/MessageList.tsx`
-  - [ ] Use FlatList with inverted
-  - [ ] Render MessageBubble for each message
-  - [ ] Add date separators
-  - [ ] Auto-scroll to bottom on new message
-  - [ ] Enable manual scroll
-  - [ ] Add loading indicator
+- [x] **Create MessageList**
+  - [x] Create `components/chat/MessageList.tsx`
+  - [x] Use FlatList (not inverted, scrolls to bottom)
+  - [x] Render MessageBubble for each message
+  - [x] Add date separators
+  - [x] Auto-scroll to bottom on new message
+  - [x] Enable manual scroll
+  - [x] Add loading indicator
 
 ### 2.9 Message Bubble Component (1.5 hours)
-- [ ] **Create MessageBubble**
-  - [ ] Create `components/chat/MessageBubble.tsx`
-  - [ ] Sent messages: right-aligned, blue background
-  - [ ] Received messages: left-aligned, gray background
-  - [ ] Display message text
-  - [ ] Display timestamp (small, gray)
-  - [ ] Display status icons (✓, ✓✓)
-  - [ ] Add avatar for received messages
-  - [ ] Style for light/dark theme
-  - [ ] Add bubble tail (optional)
+- [x] **Create MessageBubble**
+  - [x] Create `components/chat/MessageBubble.tsx`
+  - [x] Sent messages: right-aligned, blue background
+  - [x] Received messages: left-aligned, gray background
+  - [x] Display message text
+  - [x] Display timestamp (small, gray)
+  - [x] Display status icons (✓, ✓✓)
+  - [x] Add avatar for received messages
+  - [x] Style for light/dark theme
+  - [x] Add bubble tail (border radius variation)
 
 ### 2.10 Message Input Component (1 hour)
-- [ ] **Create MessageInput**
-  - [ ] Create `components/chat/MessageInput.tsx`
-  - [ ] Multi-line TextInput (auto-growing, max 5 lines)
-  - [ ] Send button (icon or text)
-  - [ ] Disable send button when empty
-  - [ ] Clear input after send
-  - [ ] Add placeholder text
-  - [ ] Style for theme
+- [x] **Create MessageInput**
+  - [x] Create `components/chat/MessageInput.tsx`
+  - [x] Multi-line TextInput (auto-growing, max 5 lines)
+  - [x] Send button (icon or text)
+  - [x] Disable send button when empty
+  - [x] Clear input after send
+  - [x] Add placeholder text
+  - [x] Style for theme
 
 ### 2.11 Send Message Implementation (1.5 hours)
-- [ ] **Wire Up Send Functionality**
-  - [ ] Connect MessageInput to chat service
-  - [ ] Call `sendMessage()` on button press
-  - [ ] Add message to Firestore
-  - [ ] Update conversation's lastMessage
-  - [ ] Update both users' userConversations
-  - [ ] Test message appears in Firestore
-  - [ ] Test recipient sees message (use 2 accounts)
+- [x] **Wire Up Send Functionality**
+  - [x] Connect MessageInput to chat service
+  - [x] Call `sendMessage()` on button press
+  - [x] Add message to Firestore
+  - [x] Update conversation's lastMessage
+  - [x] Update both users' userConversations
+  - [x] Test message appears in Firestore
+  - [x] Test recipient sees message (use 2 accounts)
 
 ### 2.12 Real-Time Message Listener (1.5 hours)
-- [ ] **Implement Real-Time Updates**
-  - [ ] Subscribe to messages on chat screen mount
-  - [ ] Use Firestore onSnapshot
-  - [ ] Update chat store with new messages
-  - [ ] Unsubscribe on unmount (cleanup)
-  - [ ] Test: send message from Account A, see in Account B instantly
-  - [ ] Test: multiple messages in quick succession
+- [x] **Implement Real-Time Updates**
+  - [x] Subscribe to messages on chat screen mount
+  - [x] Use Firestore onSnapshot
+  - [x] Update chat store with new messages
+  - [x] Unsubscribe on unmount (cleanup)
+  - [x] Test: send message from Account A, see in Account B instantly
+  - [x] Test: multiple messages in quick succession
 
 **Day 2 Checkpoint:** ✅ Two users can exchange messages in real-time
+
+### Additional Improvements Completed:
+- [x] **Message Status Indicators** - Implemented ✓ (sent), ✓✓ (delivered/read)
+  - Added `markMessagesAsDelivered()` function
+  - Added `markMessagesAsRead()` function
+  - Automatic status updates when viewing conversations
+  - Real-time status indicator updates
+
+- [x] **User Picker Screen** - Created user selection for new conversations
+  - Built `app/users.tsx` with searchable user list
+  - Shows online status for each user
+  - Navigates to chat after conversation creation
+
+- [x] **Firestore Security Rules** - Properly configured for all operations
+  - Users can read their own data
+  - Conversation participants can read/update conversations
+  - Messages readable/writable by conversation participants
+  - UserConversations properly secured with create/update permissions
+  - Used `increment()` for atomic unread count updates
+
+- [x] **Bug Fixes & Optimizations**
+  - Fixed `photoURL` undefined issue in conversation creation
+  - Fixed permission errors with `setDoc` merge instead of read-then-update
+  - Optimized message status tracking
+  - Added conversation to store before navigation
+  - Eliminated all red error screens
+
+**Final Result:** ✅ Fully functional real-time messaging with:
+- Instant message delivery (<1 second)
+- Status indicators working correctly
+- No permission errors
+- Smooth two-way communication
+- Beautiful UI with proper feedback
 
 ---
 

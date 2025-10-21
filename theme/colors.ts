@@ -6,9 +6,11 @@
 export const colors = {
   // Primary Colors
   primary: "#4361EE", // Blue - Primary actions, sent messages
+  primaryDark: "#2D4BCE", // Darker blue for pressed states
   secondary: "#AB4E68", // Pink - Accents, highlights
   accent: "#E6C0E9", // Lavender - Subtle highlights
   success: "#9DC183", // Green - Success states, online indicator
+  error: "#DC3545", // Red - Error states
   darkPurple: "#1C0221", // Very Dark Purple - Dark mode backgrounds
 
   // Light Theme
