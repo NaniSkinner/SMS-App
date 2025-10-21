@@ -1,50 +1,169 @@
-# Welcome to your Expo app 👋
+# 💬 WhatsApp-Style Messaging App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A production-quality, real-time messaging application built with React Native, Expo, and Firebase.
 
-## Get started
+## 🎯 Project Overview
 
-1. Install dependencies
+This is a 7-day MVP project to build a WhatsApp-style messaging app with:
+- Real-time one-on-one and group messaging
+- Offline-first architecture with optimistic UI
+- Online presence & read receipts
+- Push notifications
+- Modern, polished UI
 
+## 🚀 Tech Stack
+
+- **Frontend**: React Native + Expo Router
+- **Backend**: Firebase (Authentication, Firestore, Cloud Functions, FCM)
+- **State Management**: Zustand
+- **Storage**: AsyncStorage
+- **Language**: TypeScript
+
+## 📊 Progress
+
+- ✅ **Day 0**: Setup & Configuration (8/8 tasks - 100%)
+- ✅ **Day 1**: Foundation & Authentication (12/12 tasks - 100%)
+- ⏳ **Day 2**: Core Messaging (0/15 tasks - 0%)
+- 🔜 **Day 3-7**: Coming soon...
+
+**Total Progress**: 20/83 tasks (24%)
+
+## 🛠️ Setup Instructions
+
+### Prerequisites
+
+- Node.js 18+
+- Expo CLI: `npm install -g expo-cli`
+- Firebase account
+- iOS Simulator (Mac) or Expo Go app
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/NaniSkinner/SMS-App.git
+   cd SMS-App
+   ```
+
+2. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Start the app
+3. **Configure Firebase**
+   - Copy the template: `cp services/firebase.config.template.ts services/firebase.config.ts`
+   - Add your Firebase credentials from [Firebase Console](https://console.firebase.google.com/)
+   - Enable Email/Password authentication
+   - Create Firestore database
+   - Deploy Firestore rules: `firebase deploy --only firestore:rules`
 
+4. **Run the app**
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## 🔐 Firebase Setup
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+### Required Services
+- ✅ Authentication (Email/Password)
+- ✅ Firestore Database
+- 🔜 Cloud Functions (Day 6)
+- 🔜 Cloud Messaging (Day 6)
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
+### Security Rules
+Firestore security rules are in `firestore.rules` and can be deployed via:
 ```bash
-npm run reset-project
+firebase use your-project-id
+firebase deploy --only firestore:rules
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## 📱 Features
 
-## Learn more
+### ✅ Completed (Day 0-1)
+- [x] Email/Password authentication
+- [x] User registration & login
+- [x] Session persistence
+- [x] User profiles in Firestore
+- [x] Protected routes & auto-navigation
+- [x] Beautiful, modern UI
+- [x] Light theme support
 
-To learn more about developing your project with Expo, look at the following resources:
+### 🔜 Coming Soon (Day 2-7)
+- [ ] One-on-one messaging
+- [ ] Real-time message sync
+- [ ] Optimistic UI
+- [ ] Offline support
+- [ ] Online presence
+- [ ] Read receipts
+- [ ] Group chat
+- [ ] Push notifications
+- [ ] Dark theme
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+## 📁 Project Structure
 
-## Join the community
+```
+messageapp/
+├── app/                    # Expo Router pages
+│   ├── (auth)/            # Authentication screens
+│   ├── (tabs)/            # Main app tabs
+│   └── _layout.tsx        # Root layout with auth guards
+├── services/              # Firebase & API services
+│   ├── auth.ts           # Authentication logic
+│   ├── user.ts           # User profile management
+│   └── firebase.config.ts # Firebase config (gitignored)
+├── stores/                # Zustand state stores
+│   └── authStore.ts      # Authentication state
+├── types/                 # TypeScript definitions
+│   └── index.ts          # All type definitions
+├── theme/                 # Theme & styling
+│   └── colors.ts         # Color palette
+├── components/            # Reusable components (coming soon)
+├── Docs/                  # Project documentation
+│   ├── PRDmvp.md         # Product requirements
+│   ├── Architecture.md    # System architecture
+│   └── TasksMVP.md       # Implementation tasks
+├── firestore.rules       # Firestore security rules
+└── firebase.json         # Firebase configuration
 
-Join our community of developers creating universal apps.
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+## 🧪 Testing
+
+### Current Features to Test
+1. **Registration**: Create a new account
+2. **Login**: Sign in with credentials
+3. **Session Persistence**: Close and reopen app (stays logged in)
+4. **Profile**: View user info in Profile tab
+5. **Sign Out**: Logout and redirect to login
+
+## 📚 Documentation
+
+- [Product Requirements (PRD)](Docs/PRDmvp.md)
+- [Technical Architecture](Docs/Architecture.md)
+- [Implementation Tasks](Docs/TasksMVP.md)
+
+## 🔒 Security
+
+- Firebase configuration with credentials is **gitignored**
+- Firestore security rules enforce authentication
+- Users can only access their own data and conversations they're part of
+
+## 🤝 Contributing
+
+This is a solo MVP project, but feedback and suggestions are welcome!
+
+## 📄 License
+
+This project is for educational and portfolio purposes.
+
+## 👨‍💻 Author
+
+**Nani Skinner**
+- GitHub: [@NaniSkinner](https://github.com/NaniSkinner)
+
+---
+
+## 🎯 Next Steps
+
+Continue with Day 2 to implement core messaging functionality!
+

@@ -1,24 +1,75 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import 'react-native-reanimated';
+/**
+ * Root Layout
+ * Handles authentication state and navigation
+ */
 
-import { useColorScheme } from '@/hooks/use-color-scheme';
-
-export const unstable_settings = {
-  anchor: '(tabs)',
-};
+import { useAuthStore } from "@/stores/authStore";
+import { colors } from "@/theme/colors";
+import { Stack, router, usePathname, useSegments } from "expo-router";
+import { useEffect } from "react";
+import { ActivityIndicator, View } from "react-native";
 
 export default function RootLayout() {
-  const colorScheme = useColorScheme();
+  const { isAuthenticated, isLoading, initializeAuth } = useAuthStore();
+  const segments = useSegments();
+  const pathname = usePathname();
+
+  // Initialize auth on app start
+  useEffect(() => {
+    initializeAuth();
+  }, []);
+
+  // Handle navigation based on auth state
+  useEffect(() => {
+    console.log("🧭 Navigation check:", {
+      isAuthenticated,
+      isLoading,
+      pathname,
+    });
+
+    if (isLoading) return;
+
+    // Check if we're in an auth route
+    const inAuthGroup =
+      pathname?.startsWith("/login") || pathname?.startsWith("/register");
+
+    if (!isAuthenticated && !inAuthGroup) {
+      // Redirect to login if not authenticated
+      console.log("➡️ Redirecting to login (not authenticated)");
+      // @ts-ignore - expo-router typed routes issue
+      router.replace("/login");
+    } else if (isAuthenticated && inAuthGroup) {
+      // Redirect to main app if authenticated
+      console.log("➡️ Redirecting to main app (authenticated)");
+      // @ts-ignore - expo-router typed routes issue
+      router.replace("/(tabs)/");
+    }
+  }, [isAuthenticated, isLoading, pathname]);
+
+  // Show loading screen while checking auth
+  if (isLoading) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colors.light.background,
+        }}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
 
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
-      </Stack>
-      <StatusBar style="auto" />
-    </ThemeProvider>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    >
+      <Stack.Screen name="(auth)" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
   );
 }
