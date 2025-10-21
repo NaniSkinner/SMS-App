@@ -6,6 +6,12 @@
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
 import {
+  addToOfflineQueue,
+  cacheMessages,
+  getCachedMessages,
+} from "@/services/cache";
+import {
+  createOptimisticMessage,
   markMessagesAsDelivered,
   markMessagesAsRead,
   sendMessage,
@@ -14,7 +20,9 @@ import {
 import { updateLastMessage } from "@/services/conversations";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useUIStore } from "@/stores/uiStore";
 import { colors } from "@/theme/colors";
+import { Message } from "@/types";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -36,8 +44,11 @@ export default function ChatScreen() {
     messages,
     setMessages,
     addMessage,
+    replaceOptimisticMessage,
+    updateMessageStatus,
     setActiveConversation,
   } = useChatStore();
+  const { isOffline } = useUIStore();
 
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(true);
@@ -52,6 +63,18 @@ export default function ChatScreen() {
 
     setActiveConversation(conversationId);
 
+    // Load cached messages first for instant display
+    const loadCachedMessages = async () => {
+      const cached = await getCachedMessages(conversationId);
+      if (cached.length > 0) {
+        setMessages(conversationId, cached);
+        setIsLoadingMessages(false);
+        console.log(`📂 Loaded ${cached.length} cached messages instantly`);
+      }
+    };
+
+    loadCachedMessages();
+
     // Mark messages as delivered when conversation opens
     markMessagesAsDelivered(conversationId, user.id);
 
@@ -62,6 +85,9 @@ export default function ChatScreen() {
     const unsubscribe = subscribeToMessages(conversationId, (newMessages) => {
       setMessages(conversationId, newMessages);
       setIsLoadingMessages(false);
+
+      // Cache the new messages
+      cacheMessages(conversationId, newMessages);
 
       // Mark new messages as delivered and read when they arrive
       setTimeout(() => {
@@ -80,14 +106,46 @@ export default function ChatScreen() {
   const handleSendMessage = async (text: string) => {
     if (!user || !conversation) return;
 
-    setIsSending(true);
     setError(null);
 
+    // 1. Create optimistic message
+    const optimisticMessage = createOptimisticMessage(
+      conversationId,
+      text,
+      user.id
+    );
+
+    // 2. Add to store immediately for instant UI feedback
+    addMessage(conversationId, optimisticMessage);
+
+    console.log(
+      `⚡ Optimistic message added with localId: ${optimisticMessage.localId}`
+    );
+
+    // 3. If offline, add to queue and return
+    if (isOffline) {
+      console.log("📥 Device offline, adding message to queue");
+      await addToOfflineQueue(conversationId, optimisticMessage);
+      return;
+    }
+
+    // 4. Send to Firestore asynchronously
     try {
-      // Send message to Firestore
-      const result = await sendMessage(conversationId, text, user.id);
+      const result = await sendMessage(
+        conversationId,
+        text,
+        user.id,
+        optimisticMessage.localId // Pass localId for tracking
+      );
 
       if (result.success && result.data) {
+        // 5. Replace optimistic message with server message
+        replaceOptimisticMessage(
+          conversationId,
+          optimisticMessage.localId,
+          result.data
+        );
+
         // Update last message in conversation
         await updateLastMessage(conversationId, {
           text,
@@ -95,15 +153,80 @@ export default function ChatScreen() {
           senderName: user.displayName,
         });
 
-        console.log("✅ Message sent successfully");
+        console.log(
+          `✅ Optimistic message replaced with server message: ${result.data.id}`
+        );
       } else {
+        // 6. Mark as failed if send fails
+        updateMessageStatus(
+          conversationId,
+          optimisticMessage.localId,
+          "failed"
+        );
         setError(result.error || "Failed to send message");
+        console.error("❌ Failed to send message:", result.error);
       }
     } catch (err) {
-      console.error("Error sending message:", err);
+      console.error("❌ Error sending message:", err);
+      updateMessageStatus(conversationId, optimisticMessage.localId, "failed");
       setError("Failed to send message");
-    } finally {
-      setIsSending(false);
+    }
+  };
+
+  const handleRetryMessage = async (failedMessage: Message) => {
+    if (!user) return;
+
+    console.log(
+      `🔄 Retrying failed message: ${failedMessage.localId || failedMessage.id}`
+    );
+
+    // Update status to sending
+    const messageId = failedMessage.localId || failedMessage.id;
+    updateMessageStatus(conversationId, messageId, "sending");
+
+    // If offline, add to queue
+    if (isOffline) {
+      console.log("📥 Device offline, adding retry to queue");
+      await addToOfflineQueue(conversationId, {
+        ...failedMessage,
+        status: "sending",
+        localId: failedMessage.localId || failedMessage.id,
+      } as any);
+      return;
+    }
+
+    // Try to send again
+    try {
+      const result = await sendMessage(
+        conversationId,
+        failedMessage.text,
+        user.id,
+        failedMessage.localId
+      );
+
+      if (result.success && result.data) {
+        replaceOptimisticMessage(
+          conversationId,
+          failedMessage.localId || failedMessage.id,
+          result.data
+        );
+
+        await updateLastMessage(conversationId, {
+          text: failedMessage.text,
+          senderId: user.id,
+          senderName: user.displayName,
+        });
+
+        console.log(`✅ Successfully retried message: ${result.data.id}`);
+      } else {
+        updateMessageStatus(conversationId, messageId, "failed");
+        setError(result.error || "Failed to send message");
+        console.error("❌ Retry failed:", result.error);
+      }
+    } catch (err) {
+      console.error("❌ Error retrying message:", err);
+      updateMessageStatus(conversationId, messageId, "failed");
+      setError("Failed to send message");
     }
   };
 
@@ -203,6 +326,7 @@ export default function ChatScreen() {
             currentUserId={user.id}
             conversation={conversation}
             isLoading={isLoadingMessages}
+            onRetry={handleRetryMessage}
           />
         )}
       </View>

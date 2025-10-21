@@ -20,6 +20,7 @@ interface MessageListProps {
   currentUserId: string;
   conversation: Conversation;
   isLoading?: boolean;
+  onRetry?: (message: Message) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -27,6 +28,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   currentUserId,
   conversation,
   isLoading = false,
+  onRetry,
 }) => {
   const flatListRef = useRef<FlatList>(null);
 
@@ -117,6 +119,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           showAvatar={showAvatar}
           senderName={senderDetails?.displayName}
           senderPhotoURL={senderDetails?.photoURL}
+          onRetry={onRetry}
         />
       </View>
     );
@@ -136,8 +139,8 @@ export const MessageList: React.FC<MessageListProps> = ({
       ref={flatListRef}
       data={messages}
       renderItem={renderMessage}
-      keyExtractor={(item) =>
-        item.id || item.localId || Math.random().toString()
+      keyExtractor={(item, index) =>
+        item.localId || item.id || `message-${index}`
       }
       contentContainerStyle={styles.listContent}
       ListEmptyComponent={

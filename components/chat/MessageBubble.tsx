@@ -7,7 +7,7 @@ import { Avatar } from "@/components/common/Avatar";
 import { colors } from "@/theme/colors";
 import { Message } from "@/types";
 import React from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 interface MessageBubbleProps {
   message: Message;
@@ -15,6 +15,7 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   senderName?: string;
   senderPhotoURL?: string;
+  onRetry?: (message: Message) => void;
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -23,6 +24,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   showAvatar = false,
   senderName,
   senderPhotoURL,
+  onRetry,
 }) => {
   // Format timestamp
   const formatTime = (date: Date): string => {
@@ -126,9 +128,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </View>
         </View>
 
-        {/* Failed message indicator */}
-        {message.status === "failed" && (
-          <Text style={styles.failedText}>Tap to retry</Text>
+        {/* Failed message indicator with retry button */}
+        {message.status === "failed" && onRetry && (
+          <Pressable
+            onPress={() => onRetry(message)}
+            style={({ pressed }) => [
+              styles.retryButton,
+              pressed && styles.retryButtonPressed,
+            ]}
+          >
+            <Text style={styles.failedText}>⟲ Tap to retry</Text>
+          </Pressable>
         )}
       </View>
     </View>
@@ -223,7 +233,7 @@ const styles = StyleSheet.create({
     color: "rgba(255, 255, 255, 0.8)",
   },
   statusIconRead: {
-    color: "#4FC3F7", // Light blue for read
+    color: "#4ADE80", // Green for read (better visibility on blue)
   },
   statusIconFailed: {
     color: colors.error,
@@ -233,5 +243,15 @@ const styles = StyleSheet.create({
     color: colors.error,
     marginTop: 2,
     fontStyle: "italic",
+  },
+  retryButton: {
+    marginTop: 4,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+    backgroundColor: colors.error + "10",
+  },
+  retryButtonPressed: {
+    opacity: 0.7,
   },
 });

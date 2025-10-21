@@ -3,7 +3,12 @@
  * Handles message sending, receiving, and real-time subscriptions
  */
 
-import { ApiResponse, Message, MessageStatus } from "@/types";
+import {
+  ApiResponse,
+  Message,
+  MessageStatus,
+  OptimisticMessage,
+} from "@/types";
 import {
   addDoc,
   collection,
@@ -16,6 +21,7 @@ import {
   Unsubscribe,
   updateDoc,
 } from "firebase/firestore";
+import { v4 as uuidv4 } from "uuid";
 import { db } from "./firebase.config";
 
 /**
@@ -66,12 +72,37 @@ export const getMessages = async (
 };
 
 /**
- * Send a message to a conversation
+ * Create an optimistic message for instant UI feedback
+ */
+export const createOptimisticMessage = (
+  conversationId: string,
+  text: string,
+  senderId: string
+): OptimisticMessage => {
+  const localId = uuidv4();
+  const now = new Date();
+
+  return {
+    id: "", // Will be replaced with server ID
+    localId,
+    conversationId,
+    senderId,
+    text: text.trim(),
+    timestamp: now,
+    status: "sending",
+    readBy: [senderId],
+    createdAt: now,
+  };
+};
+
+/**
+ * Send a message to a conversation with optimistic UI support
  */
 export const sendMessage = async (
   conversationId: string,
   text: string,
-  senderId: string
+  senderId: string,
+  localId?: string // Optional localId for tracking optimistic message
 ): Promise<ApiResponse<Message>> => {
   try {
     if (!text.trim()) {
@@ -102,9 +133,10 @@ export const sendMessage = async (
 
     console.log(`✅ Message sent successfully: ${docRef.id}`);
 
-    // Return the message with the generated ID
+    // Return the message with the generated ID and localId for replacement
     const message: Message = {
       id: docRef.id,
+      localId: localId, // Keep localId for optimistic replacement
       conversationId,
       senderId,
       text: text.trim(),

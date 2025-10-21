@@ -59,9 +59,12 @@ export const createUserProfile = async (
     };
   } catch (error: any) {
     console.error("❌ Error creating user profile:", error);
+    console.error("❌ Error details:", error.message, error.code);
     return {
       success: false,
-      error: "Failed to create user profile. Please try again.",
+      error: `Failed to create user profile: ${
+        error.message || error.code || "Unknown error"
+      }`,
     };
   }
 };
@@ -103,9 +106,12 @@ export const getUserProfile = async (
     };
   } catch (error: any) {
     console.error("❌ Error getting user profile:", error);
+    console.error("❌ Error details:", error.message, error.code);
     return {
       success: false,
-      error: "Failed to load user profile.",
+      error: `Failed to load user profile: ${
+        error.message || error.code || "Unknown error"
+      }`,
     };
   }
 };

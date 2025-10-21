@@ -4,6 +4,7 @@
  */
 
 import { ConversationListItem } from "@/components/conversation/ConversationListItem";
+import { cacheConversations, getCachedConversations } from "@/services/cache";
 import { getConversations } from "@/services/conversations";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
@@ -30,6 +31,24 @@ export default function ChatsScreen() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    let hasLoadedCache = false;
+
+    // Load cached conversations first
+    const loadCached = async () => {
+      const cached = await getCachedConversations();
+      if (cached.length > 0 && !hasLoadedCache) {
+        hasLoadedCache = true;
+        setConversations(cached);
+        setIsLoading(false);
+        console.log(
+          `📂 Loaded ${cached.length} cached conversations instantly`
+        );
+      }
+    };
+
+    loadCached();
+
+    // Load fresh conversations from server
     loadConversations();
   }, [user]);
 
@@ -41,6 +60,8 @@ export default function ChatsScreen() {
 
     if (result.success && result.data) {
       setConversations(result.data);
+      // Cache the conversations
+      await cacheConversations(result.data);
     } else {
       setError(result.error || "Failed to load conversations");
     }
@@ -89,7 +110,7 @@ export default function ChatsScreen() {
       <FlatList
         data={conversations}
         renderItem={renderConversationItem}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => `${item.id}-${index}`}
         contentContainerStyle={
           conversations.length === 0 && styles.emptyListContent
         }
