@@ -20,7 +20,8 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.messageapp.messaging"
     },
     "web": {
       "output": "static",
@@ -53,6 +54,13 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "fb55a95f-253e-4e24-95b3-f38ea3d22463"
+      }
+    },
+    "owner": "naniskinner"
   }
 }

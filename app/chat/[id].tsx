@@ -25,6 +25,7 @@ import {
   setUserTyping,
   subscribeToTypingStatus,
 } from "@/services/typing";
+import { updateActiveConversation } from "@/services/user";
 import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useUIStore } from "@/stores/uiStore";
@@ -82,6 +83,9 @@ export default function ChatScreen() {
     if (!conversationId || !user) return;
 
     setActiveConversation(conversationId);
+
+    // Update active conversation to prevent push notifications while viewing
+    updateActiveConversation(user.id, conversationId);
 
     // Load cached messages first for instant display
     const loadCachedMessages = async () => {
@@ -154,6 +158,8 @@ export default function ChatScreen() {
       // Clear own typing status on unmount
       clearUserTyping(conversationId, user.id);
       setActiveConversation(null);
+      // Clear active conversation to allow push notifications again
+      updateActiveConversation(user.id, null);
     };
   }, [conversationId, user, otherUserId]);
 

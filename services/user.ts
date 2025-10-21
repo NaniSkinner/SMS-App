@@ -240,3 +240,23 @@ export const getAllUsers = async (
     };
   }
 };
+
+/**
+ * Update the user's active conversation ID
+ * Used to prevent push notifications when user is viewing a conversation
+ */
+export const updateActiveConversation = async (
+  userId: string,
+  conversationId: string | null
+): Promise<void> => {
+  try {
+    const userRef = doc(db, "users", userId);
+    await updateDoc(userRef, {
+      activeConversationId: conversationId,
+    });
+    console.log("✅ Updated active conversation:", conversationId);
+  } catch (error) {
+    console.error("❌ Error updating active conversation:", error);
+    // Don't throw - this is not critical
+  }
+};
