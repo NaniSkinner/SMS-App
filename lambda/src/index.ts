@@ -65,7 +65,12 @@ export const handler = async (
 function handleHealth(): APIGatewayProxyResult {
   return {
     statusCode: 200,
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "Content-Type,Authorization",
+      "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    },
     body: JSON.stringify({
       status: "ok",
       version: "1.0.0",
