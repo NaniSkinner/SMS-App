@@ -4,13 +4,18 @@
  */
 
 import { sendAIChat } from "@/services/ai";
+import {
+  isCalendarConnected,
+  useGoogleCalendarAuth,
+} from "@/services/googleAuth";
 import { useAuthStore } from "@/stores/authStore";
 import { colors } from "@/theme/colors";
 import { AIChatMessage } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -26,7 +31,51 @@ export default function AIChatScreen() {
   const [messages, setMessages] = useState<AIChatMessage[]>([]);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [checkingCalendar, setCheckingCalendar] = useState(true);
   const flatListRef = useRef<FlatList>(null);
+
+  // Google Calendar OAuth hook
+  const { promptAsync, isLoading: isAuthLoading } = useGoogleCalendarAuth();
+
+  // Check calendar connection status on mount
+  useEffect(() => {
+    checkCalendarConnection();
+  }, []);
+
+  const checkCalendarConnection = async () => {
+    setCheckingCalendar(true);
+    const connected = await isCalendarConnected();
+    setCalendarConnected(connected);
+    setCheckingCalendar(false);
+  };
+
+  const handleConnectCalendar = async () => {
+    try {
+      const result = await promptAsync();
+
+      if (result?.type === "success") {
+        Alert.alert(
+          "✅ Calendar Connected",
+          "Your Google Calendar has been connected successfully!",
+          [{ text: "OK", onPress: () => checkCalendarConnection() }]
+        );
+      } else if (result?.type === "error") {
+        Alert.alert(
+          "❌ Connection Failed",
+          "Failed to connect Google Calendar. Please try again.",
+          [{ text: "OK" }]
+        );
+      }
+    } catch (error) {
+      console.error("Error connecting calendar:", error);
+      Alert.alert(
+        "❌ Error",
+        "An error occurred while connecting your calendar.",
+        [{ text: "OK" }]
+      );
+    }
+  };
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || isLoading || !user) {
@@ -144,6 +193,50 @@ export default function AIChatScreen() {
       <Text style={styles.emptyStateHint}>
         Send a message to start chatting with the AI
       </Text>
+
+      {/* Calendar Connection Status */}
+      <View style={styles.calendarSection}>
+        <Ionicons
+          name={calendarConnected ? "calendar" : "calendar-outline"}
+          size={24}
+          color={
+            calendarConnected ? colors.primary : colors.light.textSecondary
+          }
+        />
+        <Text style={styles.calendarStatusText}>
+          {checkingCalendar
+            ? "Checking calendar..."
+            : calendarConnected
+            ? "✅ Calendar Connected"
+            : "Calendar not connected"}
+        </Text>
+      </View>
+
+      {!calendarConnected && !checkingCalendar && (
+        <TouchableOpacity
+          style={styles.connectCalendarButton}
+          onPress={handleConnectCalendar}
+          disabled={isAuthLoading}
+        >
+          {isAuthLoading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="link" size={20} color="#fff" />
+              <Text style={styles.connectCalendarText}>
+                Connect Google Calendar
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
+
+      {calendarConnected && (
+        <Text style={styles.calendarHint}>
+          💡 Now you can ask me about your schedule, create events, and check
+          for conflicts!
+        </Text>
+      )}
     </View>
   );
 
@@ -297,5 +390,45 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.light.textTertiary,
     textAlign: "center",
+  },
+  calendarSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.light.inputBackground,
+    borderRadius: 12,
+    gap: 8,
+  },
+  calendarStatusText: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+    fontWeight: "500",
+  },
+  connectCalendarButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginTop: 16,
+    gap: 8,
+    minWidth: 200,
+  },
+  connectCalendarText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  calendarHint: {
+    fontSize: 13,
+    color: colors.light.textSecondary,
+    textAlign: "center",
+    marginTop: 16,
+    fontStyle: "italic",
+    paddingHorizontal: 32,
   },
 });

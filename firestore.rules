@@ -25,6 +25,37 @@ service cloud.firestore {
       allow create, update: if request.auth != null;  // Allow participants to update (for unread counts, etc.)
       allow delete: if request.auth != null && request.auth.uid == userId;
     }
+    
+    // ========================================
+    // AI Feature Collections (NEW)
+    // ========================================
+    
+    // Calendar tokens (OAuth) - SENSITIVE DATA
+    match /users/{userId}/tokens/{tokenId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // AI conversations - User's AI chat history
+    match /users/{userId}/ai_conversations/{conversationId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // AI preferences - User's AI settings
+    match /users/{userId}/ai_preferences {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // AI suggestions on messages - Conflict detection results
+    match /conversations/{conversationId}/messages/{messageId}/ai_suggestions/{suggestionId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null;
+    }
+    
+    // AI feedback - Global feedback collection (write-only for users)
+    match /ai_feedback/{feedbackId} {
+      allow create: if request.auth != null;
+      allow read, update, delete: if false; // Only admins can read feedback
+    }
   }
 }
 

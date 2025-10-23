@@ -49,7 +49,8 @@
           "sounds": [],
           "mode": "default"
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
