@@ -67,6 +67,26 @@ A production-quality, real-time messaging application built with React Native, E
 - EAS CLI
 - Firebase CLI
 
+### AI Backend
+
+- AWS Lambda (serverless functions)
+- OpenAI GPT-4o (AI chat completion)
+- AWS Secrets Manager (secure credential storage)
+- AWS API Gateway (REST API endpoints)
+
+The AI backend is a separate serverless system built on AWS Lambda. It provides intelligent features like chat completions and event extraction from natural language.
+
+**Current Status:** Epic 0.2 Complete (OpenAI Integration)
+
+**Available Endpoints:**
+
+- `/health` - Health check
+- `/ai/chat` - AI chat completions with GPT-4o
+- `/ai/extract-event` - Extract calendar events from text
+
+📄 **For deployment instructions and API documentation, see:**  
+[`/lambda/DEPLOYMENT_GUIDE.md`](../lambda/DEPLOYMENT_GUIDE.md)
+
 ## Project Structure
 
 ```

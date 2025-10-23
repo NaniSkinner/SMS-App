@@ -270,3 +270,46 @@ export interface CreateGroupFormData {
   groupName: string;
   participants: string[];
 }
+
+// ========================================
+// AI TYPES
+// ========================================
+
+export interface AIChatMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  timestamp: Date;
+}
+
+export interface AIChatRequest {
+  userId: string;
+  message: string; // Note: Lambda expects "message" not "messageText"
+  conversationHistory?: Array<{ role: string; content: string }>;
+}
+
+export interface AIChatResponse {
+  reply: string;
+  reasoning?: string[];
+  toolsCalled?: string[];
+  events?: any[];
+}
+
+export interface AIExtractEventRequest {
+  userId: string;
+  messageText: string;
+}
+
+export interface AIExtractedEvent {
+  title: string;
+  dateTime: string;
+  location?: string;
+  description?: string;
+  confidence: "high" | "medium" | "low";
+}
+
+export interface AIExtractEventResponse {
+  event: AIExtractedEvent | null;
+  hasEvent: boolean;
+  timestamp: string;
+}

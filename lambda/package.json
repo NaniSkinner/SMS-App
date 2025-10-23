@@ -5,14 +5,16 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc",
-    "package": "npm run build && cd dist && zip -r ../function.zip . && cd ..",
-    "deploy": "npm run package && aws lambda update-function-code --function-name messageai-service --zip-file fileb://function.zip",
+    "package": "npm run build && npm prune --production && zip -r function.zip dist/ node_modules/ package.json && npm install",
+    "package:lite": "npm run build && rm -rf node_modules && npm install --production && zip -r function.zip dist/ node_modules/ package.json && npm install",
+    "deploy": "npm run package:lite && aws s3 cp function.zip s3://messageai-lambda-deployments/function.zip --region us-east-2 && aws lambda update-function-code --function-name messageai-service --s3-bucket messageai-lambda-deployments --s3-key function.zip --region us-east-2",
     "test": "node dist/index.js"
   },
   "dependencies": {
-    "openai": "^4.20.0",
+    "@aws-sdk/client-secrets-manager": "^3.914.0",
+    "firebase-admin": "^12.0.0",
     "googleapis": "^128.0.0",
-    "firebase-admin": "^12.0.0"
+    "openai": "^4.20.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.130",
