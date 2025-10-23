@@ -28,6 +28,7 @@ services/firebase.config.ts
 .env
 .env.local
 .env.*.local
+.env.aws
 
 # Logs
 logs
