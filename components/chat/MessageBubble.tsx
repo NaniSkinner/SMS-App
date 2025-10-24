@@ -7,7 +7,15 @@ import { Avatar } from "@/components/common/Avatar";
 import { colors } from "@/theme/colors";
 import { Message } from "@/types";
 import React, { useEffect, useRef } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  ActionSheetIOS,
+  Animated,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 interface MessageBubbleProps {
   message: Message;
@@ -19,6 +27,7 @@ interface MessageBubbleProps {
   isGroupChat?: boolean;
   totalParticipants?: number;
   onReadStatusPress?: (message: Message) => void;
+  onAnalyzeWithAI?: (message: Message) => void; // NEW: Callback for AI analysis
 }
 
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
@@ -31,6 +40,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isGroupChat = false,
   totalParticipants = 0,
   onReadStatusPress,
+  onAnalyzeWithAI,
 }) => {
   const slideAnim = useRef(new Animated.Value(20)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -85,6 +95,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
         return "!"; // Exclamation
       default:
         return "";
+    }
+  };
+
+  // Handle long press - show action sheet with AI analysis option
+  const handleLongPress = () => {
+    if (Platform.OS === "ios") {
+      const options = [
+        "Copy",
+        "Analyze with AI 🤖", // NEW: AI analysis
+        "Delete",
+        "Cancel",
+      ];
+      const destructiveButtonIndex = 2;
+      const cancelButtonIndex = 3;
+
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options,
+          cancelButtonIndex,
+          destructiveButtonIndex,
+          title: "Message Actions",
+        },
+        (buttonIndex: number) => {
+          if (buttonIndex === 0) {
+            // Copy (could implement clipboard)
+            console.log("Copy message:", message.text);
+          } else if (buttonIndex === 1) {
+            // Analyze with AI
+            if (onAnalyzeWithAI) {
+              console.log("🤖 Analyzing message with AI:", message.id);
+              onAnalyzeWithAI(message);
+            }
+          } else if (buttonIndex === 2) {
+            // Delete (could implement)
+            console.log("Delete message:", message.id);
+          }
+        }
+      );
     }
   };
 
@@ -152,12 +200,15 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </Text>
         )}
 
-        {/* Message bubble */}
-        <View
-          style={[
+        {/* Message bubble - with long press for AI analysis */}
+        <Pressable
+          onLongPress={onAnalyzeWithAI ? handleLongPress : undefined}
+          delayLongPress={500}
+          style={({ pressed }) => [
             styles.bubble,
             isOwnMessage ? styles.bubbleOwn : styles.bubbleOther,
             message.status === "failed" && styles.bubbleFailed,
+            pressed && styles.bubblePressed,
           ]}
         >
           <Text
@@ -201,7 +252,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               </Text>
             )}
           </Pressable>
-        </View>
+        </Pressable>
 
         {/* Failed message indicator with retry button */}
         {message.status === "failed" && onRetry && (
@@ -302,6 +353,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.error + "20",
     borderWidth: 1,
     borderColor: colors.error,
+  },
+  bubblePressed: {
+    opacity: 0.7,
+    transform: [{ scale: 0.98 }],
   },
   messageText: {
     fontSize: 16,

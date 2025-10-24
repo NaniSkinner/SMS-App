@@ -281,11 +281,26 @@ export async function chatWithMessagesAndTools(
 /**
  * Extract event information from text
  */
-export async function extractEventFromText(messageText: string): Promise<any> {
+export async function extractEventFromText(
+  messageText: string,
+  timezone: string = "America/Chicago"
+): Promise<any> {
   try {
     const client = await getClient();
 
+    // Get current date/time in user's timezone
+    const now = new Date();
+    const currentDate = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: timezone,
+    });
+
     const prompt = `Extract scheduling information from the following text.
+
+CURRENT DATE: ${currentDate}
 
 Output JSON format:
 {
@@ -302,10 +317,11 @@ Output JSON format:
 }
 
 Rules:
-1. Extract explicit dates/times
-2. Infer reasonable defaults (1 hour duration)
-3. Flag ambiguous information
-4. Be conservative - better to ask than guess wrong
+1. Use the CURRENT DATE above when interpreting "today", "tomorrow", etc.
+2. Extract explicit dates/times
+3. Infer reasonable defaults (1 hour duration)
+4. Flag ambiguous information
+5. Be conservative - better to ask than guess wrong
 
 Text: "${messageText}"`;
 

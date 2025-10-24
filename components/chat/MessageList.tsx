@@ -22,6 +22,7 @@ interface MessageListProps {
   isLoading?: boolean;
   onRetry?: (message: Message) => void;
   onReadStatusPress?: (message: Message) => void;
+  onAnalyzeWithAI?: (message: Message) => void;
 }
 
 export const MessageList: React.FC<MessageListProps> = ({
@@ -31,6 +32,7 @@ export const MessageList: React.FC<MessageListProps> = ({
   isLoading = false,
   onRetry,
   onReadStatusPress,
+  onAnalyzeWithAI,
 }) => {
   const flatListRef = useRef<FlatList>(null);
 
@@ -124,6 +126,7 @@ export const MessageList: React.FC<MessageListProps> = ({
           isGroupChat={conversation.type === "group"}
           totalParticipants={conversation.participants.length}
           onReadStatusPress={onReadStatusPress}
+          onAnalyzeWithAI={onAnalyzeWithAI}
         />
       </View>
     );

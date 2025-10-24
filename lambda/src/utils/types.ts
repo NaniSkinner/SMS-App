@@ -22,6 +22,7 @@ export interface ExtractEventRequest {
   userId: string;
   conversationId?: string;
   messageId?: string;
+  timezone?: string; // User's timezone for date interpretation
 }
 
 export interface ExtractEventResponse {
@@ -29,6 +30,7 @@ export interface ExtractEventResponse {
   event?: ExtractedEvent;
   conflicts?: CalendarEvent[];
   needsConfirmation?: boolean;
+  alternativeTimes?: string[]; // Suggested alternative time slots when conflicts exist
 }
 
 export interface DetectConflictsRequest {
@@ -68,6 +70,7 @@ export interface CalendarEvent {
   duration: number; // minutes
   description?: string;
   location?: string;
+  overlapMinutes?: number; // For conflicts: how many minutes overlap with proposed event
 }
 
 export interface ExtractedEvent {

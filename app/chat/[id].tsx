@@ -6,6 +6,7 @@
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
 import { Avatar } from "@/components/common/Avatar";
+import { extractEventFromText } from "@/services/ai";
 import {
   addToOfflineQueue,
   cacheMessages,
@@ -68,6 +69,9 @@ export default function ChatScreen() {
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
   const [showReadStatusModal, setShowReadStatusModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<any>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -349,6 +353,35 @@ export default function ChatScreen() {
     }
   };
 
+  // Handle AI message analysis
+  const handleAnalyzeWithAI = async (message: Message) => {
+    if (!user) return;
+
+    setIsAnalyzing(true);
+    setSelectedMessage(message);
+
+    try {
+      console.log("🤖 Analyzing message with AI:", message.text);
+
+      // Use the AI service function with proper retry logic and error handling
+      const result = await extractEventFromText(user.id, message.text);
+
+      if (!result.success || !result.data) {
+        throw new Error(result.error || "Failed to analyze message");
+      }
+
+      console.log("✅ Analysis result:", result.data);
+
+      setAnalysisResult(result.data);
+      setShowAnalysisModal(true);
+    } catch (error) {
+      console.error("❌ Error analyzing message:", error);
+      setError("Failed to analyze message. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Format typing indicator text
   const getTypingText = (): string => {
     if (typingUsers.length === 0) return "";
@@ -421,6 +454,7 @@ export default function ChatScreen() {
             isLoading={isLoadingMessages}
             onRetry={handleRetryMessage}
             onReadStatusPress={handleReadStatusPress}
+            onAnalyzeWithAI={handleAnalyzeWithAI}
           />
         )}
 
@@ -497,6 +531,133 @@ export default function ChatScreen() {
           </Pressable>
         </Modal>
       )}
+
+      {/* AI Analysis Modal */}
+      <Modal
+        visible={showAnalysisModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowAnalysisModal(false)}
+      >
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowAnalysisModal(false)}
+        >
+          <Pressable style={styles.modalContent}>
+            <Text style={styles.modalTitle}>🤖 AI Analysis</Text>
+
+            {isAnalyzing ? (
+              <View style={styles.analysisLoading}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={styles.analysisLoadingText}>
+                  Analyzing message...
+                </Text>
+              </View>
+            ) : analysisResult?.hasEvent ? (
+              <View>
+                {/* Event Details */}
+                <View style={styles.analysisSection}>
+                  <Text style={styles.analysisSectionTitle}>
+                    📅 Event Found
+                  </Text>
+                  <View style={styles.eventDetails}>
+                    <Text style={styles.eventTitle}>
+                      {analysisResult.event.title}
+                    </Text>
+                    <Text style={styles.eventDetail}>
+                      📆 {analysisResult.event.date} at{" "}
+                      {analysisResult.event.time}
+                    </Text>
+                    <Text style={styles.eventDetail}>
+                      ⏱️ Duration: {analysisResult.event.duration} minutes
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Conflict Status - ALWAYS show this section */}
+                <View style={styles.analysisSection}>
+                  {analysisResult.conflicts &&
+                  analysisResult.conflicts.length > 0 ? (
+                    <>
+                      {/* HAS CONFLICTS */}
+                      <View style={styles.conflictHeader}>
+                        <Text style={styles.conflictHeaderText}>
+                          ⚠️ {analysisResult.conflicts.length} Conflict
+                          {analysisResult.conflicts.length > 1 ? "s" : ""}{" "}
+                          Detected
+                        </Text>
+                      </View>
+                      {analysisResult.conflicts.map(
+                        (conflict: any, index: number) => (
+                          <View key={index} style={styles.conflictItem}>
+                            <Text style={styles.conflictTitle}>
+                              {conflict.title}
+                            </Text>
+                            <Text style={styles.conflictTime}>
+                              {conflict.startTime} - {conflict.endTime}
+                            </Text>
+                            {conflict.overlapMinutes && (
+                              <Text style={styles.conflictOverlap}>
+                                Overlaps by {conflict.overlapMinutes} min
+                              </Text>
+                            )}
+                          </View>
+                        )
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      {/* NO CONFLICTS */}
+                      <View style={styles.availableHeader}>
+                        <Text style={styles.availableHeaderText}>
+                          ✅ Available on Calendar
+                        </Text>
+                      </View>
+                      <View style={styles.availableMessage}>
+                        <Text style={styles.availableMessageText}>
+                          No events scheduled during this time
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                {/* Alternative Times - Only show if conflicts exist */}
+                {analysisResult.alternativeTimes &&
+                  analysisResult.alternativeTimes.length > 0 &&
+                  analysisResult.conflicts &&
+                  analysisResult.conflicts.length > 0 && (
+                    <View style={styles.analysisSection}>
+                      <Text style={styles.analysisSectionTitle}>
+                        💡 Alternative Times
+                      </Text>
+                      {analysisResult.alternativeTimes.map(
+                        (time: string, index: number) => (
+                          <Text key={index} style={styles.alternativeTime}>
+                            • {time}
+                          </Text>
+                        )
+                      )}
+                    </View>
+                  )}
+              </View>
+            ) : (
+              <View style={styles.analysisEmpty}>
+                <Text style={styles.analysisEmptyText}>
+                  No calendar events detected in this message.
+                </Text>
+              </View>
+            )}
+
+            <Pressable
+              style={styles.modalCloseButton}
+              onPress={() => setShowAnalysisModal(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </KeyboardAvoidingView>
   );
 }
@@ -636,5 +797,116 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  analysisLoading: {
+    paddingVertical: 40,
+    alignItems: "center",
+  },
+  analysisLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.light.textSecondary,
+  },
+  analysisSection: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  analysisSectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.light.textPrimary,
+    marginBottom: 12,
+  },
+  eventDetails: {
+    backgroundColor: colors.light.inputBackground,
+    padding: 12,
+    borderRadius: 8,
+  },
+  eventTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.light.textPrimary,
+    marginBottom: 8,
+  },
+  eventDetail: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+    marginBottom: 4,
+  },
+  conflictHeader: {
+    backgroundColor: "#FFF3E0",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  conflictHeaderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#E65100",
+  },
+  availableHeader: {
+    backgroundColor: "#E8F5E9",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#4CAF50",
+  },
+  availableHeaderText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#2E7D32",
+  },
+  availableMessage: {
+    paddingHorizontal: 12,
+  },
+  availableMessageText: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+    textAlign: "center",
+  },
+  conflictItem: {
+    backgroundColor: "#FFF3E0",
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: "#FF9800",
+  },
+  conflictTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#E65100",
+    marginBottom: 4,
+  },
+  conflictTime: {
+    fontSize: 13,
+    color: "#F57C00",
+    marginBottom: 2,
+  },
+  conflictOverlap: {
+    fontSize: 12,
+    color: "#FF6F00",
+    fontStyle: "italic",
+  },
+  alternativeTime: {
+    fontSize: 14,
+    color: colors.light.textPrimary,
+    paddingVertical: 6,
+    paddingLeft: 8,
+  },
+  analysisEmpty: {
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  analysisEmptyText: {
+    fontSize: 14,
+    color: colors.light.textSecondary,
+    textAlign: "center",
   },
 });

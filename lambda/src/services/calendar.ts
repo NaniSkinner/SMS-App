@@ -4,19 +4,27 @@
  */
 
 import { calendar_v3, google } from "googleapis";
+import moment from "moment-timezone";
 import { getFirestore } from "./firebase";
 import { getGoogleOAuthCredentials } from "./secrets";
 
 // Cache for calendar clients (keyed by userId)
 const clientCache = new Map<string, calendar_v3.Calendar>();
 
-// Cache for calendar events (5 min TTL)
+// Cache for calendar events (5 min TTL with smart invalidation)
 interface CachedEvents {
   events: calendar_v3.Schema$Event[];
   timestamp: number;
+  isStale?: boolean; // For stale-while-revalidate strategy
 }
 const eventsCache = new Map<string, CachedEvents>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const STALE_TIME = 1 * 60 * 1000; // 1 minute - after this, data is "stale" but still usable
+
+// Prefetch tracking
+const prefetchQueue = new Set<string>();
+const lastPrefetchTime = new Map<string, number>();
+const PREFETCH_DEBOUNCE = 30 * 1000; // 30 seconds between prefetches for same user
 
 /**
  * Get OAuth2 client with user's tokens
@@ -150,43 +158,65 @@ async function getCalendarClient(
 
 /**
  * List calendar events for a date range
+ * Enhanced with stale-while-revalidate strategy
  */
 export async function listCalendarEvents(
   userId: string,
   startDate: Date,
-  endDate: Date
+  endDate: Date,
+  options: {
+    forceRefresh?: boolean;
+    allowStale?: boolean;
+  } = {}
 ): Promise<calendar_v3.Schema$Event[]> {
   try {
-    // Check cache
     const cacheKey = `${userId}-${startDate.toISOString()}-${endDate.toISOString()}`;
     const cached = eventsCache.get(cacheKey);
+    const now = Date.now();
 
-    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-      console.log("📦 Returning cached events");
+    // Force refresh bypasses all cache
+    if (options.forceRefresh) {
+      console.log("🔄 Force refreshing calendar events");
+      return await fetchAndCacheEvents(userId, startDate, endDate, cacheKey);
+    }
+
+    // If cached and fresh, return immediately
+    if (cached && now - cached.timestamp < CACHE_TTL) {
+      console.log("📦 Returning fresh cached events");
+
+      // Trigger background refresh if data is getting stale (but still valid)
+      if (now - cached.timestamp > STALE_TIME) {
+        console.log("🔄 Triggering background refresh (data is stale)");
+        // Don't await - refresh in background
+        refreshInBackground(userId, startDate, endDate, cacheKey).catch((err) =>
+          console.error("Background refresh failed:", err)
+        );
+      }
+
       return cached.events;
     }
 
-    const calendar = await getCalendarClient(userId);
+    // If cached but expired, but allowStale is true, return stale data while fetching
+    if (cached && options.allowStale) {
+      console.log("📦 Returning stale cached events while refreshing");
+      // Refresh in background
+      refreshInBackground(userId, startDate, endDate, cacheKey).catch((err) =>
+        console.error("Background refresh failed:", err)
+      );
+      return cached.events;
+    }
 
-    const response = await calendar.events.list({
-      calendarId: "primary",
-      timeMin: startDate.toISOString(),
-      timeMax: endDate.toISOString(),
-      singleEvents: true,
-      orderBy: "startTime",
-      maxResults: 100,
-    });
-
-    const events = response.data.items || [];
-
-    // Cache the results
-    eventsCache.set(cacheKey, {
-      events,
-      timestamp: Date.now(),
-    });
-
-    console.log(`✅ Retrieved ${events.length} calendar events`);
-    return events;
+    // If we have stale cache but API fails, return stale as fallback
+    try {
+      return await fetchAndCacheEvents(userId, startDate, endDate, cacheKey);
+    } catch (error) {
+      // If API fails but we have stale cache, return it
+      if (cached) {
+        console.warn("⚠️ API failed, returning stale cache as fallback");
+        return cached.events;
+      }
+      throw error;
+    }
   } catch (error: any) {
     console.error("Error listing calendar events:", error);
 
@@ -198,6 +228,150 @@ export async function listCalendarEvents(
 
     throw error;
   }
+}
+
+/**
+ * Helper: Fetch events from API and cache them
+ */
+async function fetchAndCacheEvents(
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  cacheKey: string
+): Promise<calendar_v3.Schema$Event[]> {
+  const calendar = await getCalendarClient(userId);
+
+  const response = await calendar.events.list({
+    calendarId: "primary",
+    timeMin: startDate.toISOString(),
+    timeMax: endDate.toISOString(),
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 100,
+  });
+
+  const events = response.data.items || [];
+
+  // Cache the results
+  eventsCache.set(cacheKey, {
+    events,
+    timestamp: Date.now(),
+    isStale: false,
+  });
+
+  console.log(`✅ Retrieved ${events.length} calendar events`);
+  return events;
+}
+
+/**
+ * Helper: Refresh cache in background (non-blocking)
+ */
+async function refreshInBackground(
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  cacheKey: string
+): Promise<void> {
+  // Mark as stale immediately
+  const cached = eventsCache.get(cacheKey);
+  if (cached) {
+    cached.isStale = true;
+  }
+
+  // Fetch fresh data
+  await fetchAndCacheEvents(userId, startDate, endDate, cacheKey);
+  console.log("✅ Background refresh completed");
+}
+
+/**
+ * Prefetch calendar events for upcoming dates
+ * Useful to warm the cache before user needs the data
+ */
+export async function prefetchCalendarEvents(
+  userId: string,
+  startDate: Date,
+  endDate: Date
+): Promise<void> {
+  const now = Date.now();
+  const prefetchKey = `${userId}-${startDate.toISOString()}`;
+
+  // Check if we recently prefetched for this user/date
+  const lastPrefetch = lastPrefetchTime.get(prefetchKey);
+  if (lastPrefetch && now - lastPrefetch < PREFETCH_DEBOUNCE) {
+    console.log("⏭️ Skipping prefetch (too soon since last prefetch)");
+    return;
+  }
+
+  // Check if already in prefetch queue
+  if (prefetchQueue.has(prefetchKey)) {
+    console.log("⏭️ Skipping prefetch (already in queue)");
+    return;
+  }
+
+  prefetchQueue.add(prefetchKey);
+  lastPrefetchTime.set(prefetchKey, now);
+
+  console.log(
+    `🔮 Prefetching calendar events for ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
+
+  try {
+    // Use allowStale to avoid blocking
+    await listCalendarEvents(userId, startDate, endDate, { allowStale: true });
+    console.log("✅ Prefetch completed");
+  } catch (error) {
+    console.error("⚠️ Prefetch failed:", error);
+  } finally {
+    prefetchQueue.delete(prefetchKey);
+  }
+}
+
+/**
+ * Smart cache invalidation - invalidate only relevant caches
+ * Called after create/update/delete operations
+ */
+export function invalidateEventsCacheForDate(
+  userId: string,
+  eventDate: Date
+): void {
+  console.log(`🗑️ Invalidating event cache for ${eventDate.toISOString()}`);
+
+  // Find all cache entries for this user that overlap with the event date
+  const startOfDay = new Date(eventDate);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(eventDate);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  let invalidatedCount = 0;
+  for (const [key] of eventsCache) {
+    if (key.startsWith(userId)) {
+      // Parse the date range from cache key
+      // Format: userId-startDate-endDate
+      const parts = key.split("-");
+      if (parts.length >= 3) {
+        try {
+          // Reconstruct the date strings (they might have hyphens in them)
+          const startDateStr = parts.slice(1, parts.length - 1).join("-");
+          const endDateStr = parts[parts.length - 1];
+
+          const cachedStart = new Date(startDateStr);
+          const cachedEnd = new Date(endDateStr);
+
+          // Check if event date overlaps with cached range
+          if (eventDate >= cachedStart && eventDate <= cachedEnd) {
+            eventsCache.delete(key);
+            invalidatedCount++;
+          }
+        } catch (error) {
+          // If parsing fails, invalidate to be safe
+          eventsCache.delete(key);
+          invalidatedCount++;
+        }
+      }
+    }
+  }
+
+  console.log(`✅ Invalidated ${invalidatedCount} cache entries`);
 }
 
 /**
@@ -255,8 +429,9 @@ export async function createCalendarEvent(
       requestBody: event,
     });
 
-    // Invalidate cache for this user
-    invalidateUserCache(userId);
+    // Smart cache invalidation - only invalidate caches for this date
+    const eventDateObj = new Date(eventDetails.date);
+    invalidateEventsCacheForDate(userId, eventDateObj);
 
     console.log("✅ Calendar event created:", response.data.id);
     return response.data;
@@ -344,8 +519,17 @@ export async function updateCalendarEvent(
       requestBody: event,
     });
 
-    // Invalidate cache
-    invalidateUserCache(userId);
+    // Smart cache invalidation - invalidate old and new dates
+    // Invalidate old date
+    if (existingEvent.data.start?.dateTime) {
+      const oldDate = new Date(existingEvent.data.start.dateTime);
+      invalidateEventsCacheForDate(userId, oldDate);
+    }
+    // Invalidate new date if it changed
+    if (updates.date) {
+      const newDate = new Date(updates.date);
+      invalidateEventsCacheForDate(userId, newDate);
+    }
 
     console.log("✅ Calendar event updated:", response.data.id);
     return response.data;
@@ -375,13 +559,22 @@ export async function deleteCalendarEvent(
   try {
     const calendar = await getCalendarClient(userId);
 
+    // Get event details before deleting (to know which cache to invalidate)
+    const existingEvent = await calendar.events.get({
+      calendarId: "primary",
+      eventId,
+    });
+
     await calendar.events.delete({
       calendarId: "primary",
       eventId,
     });
 
-    // Invalidate cache
-    invalidateUserCache(userId);
+    // Smart cache invalidation - only invalidate caches for the event's date
+    if (existingEvent.data.start?.dateTime) {
+      const eventDate = new Date(existingEvent.data.start.dateTime);
+      invalidateEventsCacheForDate(userId, eventDate);
+    }
 
     console.log("✅ Calendar event deleted:", eventId);
   } catch (error: any) {
@@ -409,6 +602,7 @@ export async function detectConflicts(
     date: string; // YYYY-MM-DD
     startTime: string; // HH:MM
     duration: number; // minutes
+    timezone?: string; // IANA timezone (e.g., "America/Chicago")
   }
 ): Promise<{
   hasConflict: boolean;
@@ -418,36 +612,42 @@ export async function detectConflicts(
   }>;
 }> {
   try {
-    // Parse proposed event times
-    // Important: Google Calendar events have timezone info (e.g., "2025-10-25T14:00:00-05:00")
-    // but our proposed times are just "14:00" which we need to interpret in the user's timezone
+    // Get user's timezone
+    const timezone = proposedEvent.timezone || "America/Chicago";
 
-    // Chicago is UTC-5 (CST) or UTC-6 (CDT)
-    // For simplicity, we'll assume CST (UTC-5) - in production, use a proper timezone library
-    const chicagoOffsetHours = -5; // CST offset from UTC
-
-    const [hour, minute] = proposedEvent.startTime.split(":").map(Number);
-    const [year, month, day] = proposedEvent.date.split("-").map(Number);
-
-    // Create proposed times in Chicago timezone, then convert to UTC for comparison
-    // When user says "2 PM", they mean 2 PM Chicago = 7 PM UTC (2 + 5)
-    const proposedStartChicago = new Date(year, month - 1, day, hour, minute);
-    const proposedEndChicago = new Date(
-      proposedStartChicago.getTime() + proposedEvent.duration * 60 * 1000
+    console.log(`🌍 Detecting conflicts in timezone: ${timezone}`);
+    console.log(
+      `📋 Proposed event: ${proposedEvent.date} at ${proposedEvent.startTime}`
     );
 
-    // Convert to UTC by subtracting the offset (Chicago is behind UTC)
-    // Chicago 2 PM = UTC 7 PM, so we ADD the absolute offset value
-    const proposedStart = new Date(
-      proposedStartChicago.getTime() - chicagoOffsetHours * 60 * 60 * 1000
-    );
-    const proposedEnd = new Date(
-      proposedEndChicago.getTime() - chicagoOffsetHours * 60 * 60 * 1000
+    // Use moment-timezone for accurate timezone handling
+    // Create the proposed start time in the user's timezone
+    const proposedStartMoment = moment.tz(
+      `${proposedEvent.date} ${proposedEvent.startTime}`,
+      "YYYY-MM-DD HH:mm",
+      timezone
     );
 
-    // Get events for that day
-    const dayStart = new Date(year, month - 1, day, 0, 0, 0);
-    const dayEnd = new Date(year, month - 1, day, 23, 59, 59);
+    // Calculate end time
+    const proposedEndMoment = proposedStartMoment
+      .clone()
+      .add(proposedEvent.duration, "minutes");
+
+    // Convert to JavaScript Date objects (in UTC)
+    const proposedStart = proposedStartMoment.toDate();
+    const proposedEnd = proposedEndMoment.toDate();
+
+    console.log(`⏰ Proposed start (UTC): ${proposedStart.toISOString()}`);
+    console.log(`⏰ Proposed end (UTC): ${proposedEnd.toISOString()}`);
+
+    // Get events for that day (use full day in user's timezone)
+    const dayStartMoment = moment
+      .tz(proposedEvent.date, "YYYY-MM-DD", timezone)
+      .startOf("day");
+    const dayEndMoment = dayStartMoment.clone().endOf("day");
+
+    const dayStart = dayStartMoment.toDate();
+    const dayEnd = dayEndMoment.toDate();
 
     const events = await listCalendarEvents(userId, dayStart, dayEnd);
 
@@ -492,16 +692,23 @@ export async function detectConflicts(
 }
 
 /**
- * Invalidate cache for a user
+ * Invalidate all caches for a user (use sparingly - prefer invalidateEventsCacheForDate)
+ * @deprecated Use invalidateEventsCacheForDate for more targeted cache invalidation
  */
-function invalidateUserCache(userId: string) {
+export function invalidateUserCache(userId: string): void {
+  console.log(`🗑️ Invalidating ALL caches for user ${userId}`);
+
   // Remove client cache
   clientCache.delete(userId);
 
-  // Remove events cache entries for this user
+  // Remove all events cache entries for this user
+  let invalidatedCount = 0;
   for (const [key] of eventsCache) {
     if (key.startsWith(userId)) {
       eventsCache.delete(key);
+      invalidatedCount++;
     }
   }
+
+  console.log(`✅ Invalidated ${invalidatedCount} cache entries`);
 }

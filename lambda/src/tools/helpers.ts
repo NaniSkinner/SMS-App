@@ -3,6 +3,7 @@
  * Helper functions for tool operations
  */
 
+import moment from "moment-timezone";
 import { listCalendarEvents } from "../services/calendar";
 
 /**
@@ -17,7 +18,8 @@ import { listCalendarEvents } from "../services/calendar";
 export async function findAlternativeTimes(
   userId: string,
   proposedDate: string,
-  duration: number
+  duration: number,
+  timezone: string = "America/Chicago"
 ): Promise<string[]> {
   const alternatives: string[] = [];
 
@@ -37,7 +39,8 @@ export async function findAlternativeTimes(
       proposedDateObj,
       duration,
       BUSINESS_START,
-      BUSINESS_END
+      BUSINESS_END,
+      timezone
     );
 
     if (sameDaySlots.length > 0) {
@@ -61,7 +64,8 @@ export async function findAlternativeTimes(
         nextDay,
         duration,
         BUSINESS_START,
-        BUSINESS_END
+        BUSINESS_END,
+        timezone
       );
 
       if (nextDaySlots.length > 0) {
@@ -87,7 +91,8 @@ export async function findAlternativeTimes(
           futureDay,
           duration,
           BUSINESS_START,
-          BUSINESS_END
+          BUSINESS_END,
+          timezone
         );
 
         if (daySlots.length > 0) {
@@ -121,6 +126,7 @@ export async function findAlternativeTimes(
  * @param duration - Required duration in minutes
  * @param startHour - Start of business hours (24-hour format)
  * @param endHour - End of business hours (24-hour format)
+ * @param timezone - User's IANA timezone
  * @returns Array of free time slots
  */
 async function findFreeSlotsForDay(
@@ -128,84 +134,95 @@ async function findFreeSlotsForDay(
   date: Date,
   duration: number,
   startHour: number,
-  endHour: number
+  endHour: number,
+  timezone: string = "America/Chicago"
 ): Promise<Array<{ hour: number; minute: number }>> {
-  // Get day boundaries
-  const dayStart = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    0,
-    0,
-    0
-  );
-  const dayEnd = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    23,
-    59,
-    59
-  );
+  // Get day boundaries using moment-timezone
+  const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(date.getDate()).padStart(2, "0")}`;
+
+  const dayStartMoment = moment
+    .tz(dateStr, "YYYY-MM-DD", timezone)
+    .startOf("day");
+  const dayEndMoment = dayStartMoment.clone().endOf("day");
+
+  const dayStart = dayStartMoment.toDate();
+  const dayEnd = dayEndMoment.toDate();
 
   // Fetch events for the day
   const events = await listCalendarEvents(userId, dayStart, dayEnd);
 
-  // Create list of busy time blocks
+  console.log(`📅 Found ${events.length} events on ${dateStr}`);
+
+  // Create list of busy time blocks (convert to user's timezone)
   const busyBlocks: Array<{ start: Date; end: Date }> = events
     .filter((e) => e.start?.dateTime && e.end?.dateTime)
-    .map((e) => ({
-      start: new Date(e.start!.dateTime!),
-      end: new Date(e.end!.dateTime!),
-    }))
+    .map((e) => {
+      const start = new Date(e.start!.dateTime!);
+      const end = new Date(e.end!.dateTime!);
+      console.log(
+        `  📌 Busy: ${
+          e.summary
+        } from ${start.toISOString()} to ${end.toISOString()}`
+      );
+      return { start, end };
+    })
     .sort((a, b) => a.start.getTime() - b.start.getTime());
 
   // Find free slots
   const freeSlots: Array<{ hour: number; minute: number }> = [];
 
-  // Start from business hours start
-  let currentTime = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    startHour,
-    0,
-    0
-  );
-
-  const businessEndTime = new Date(
-    date.getFullYear(),
-    date.getMonth(),
-    date.getDate(),
-    endHour,
-    0,
-    0
-  );
+  // Start from business hours start in user's timezone
+  let currentTimeMoment = moment
+    .tz(dateStr, "YYYY-MM-DD", timezone)
+    .hour(startHour)
+    .minute(0)
+    .second(0);
+  const businessEndMoment = currentTimeMoment
+    .clone()
+    .hour(endHour)
+    .minute(0)
+    .second(0);
 
   // Iterate through the day in 30-minute increments
-  while (currentTime < businessEndTime) {
-    const slotEnd = new Date(currentTime.getTime() + duration * 60 * 1000);
+  while (currentTimeMoment.isBefore(businessEndMoment)) {
+    const slotStart = currentTimeMoment.toDate();
+    const slotEnd = new Date(slotStart.getTime() + duration * 60 * 1000);
 
     // Check if this slot is free (doesn't overlap with any busy block)
     const isFree = !busyBlocks.some((block) => {
       // Overlap check: slot starts before block ends AND slot ends after block starts
-      return currentTime < block.end && slotEnd > block.start;
+      const overlaps = slotStart < block.end && slotEnd > block.start;
+      if (overlaps) {
+        console.log(
+          `  ❌ Slot ${currentTimeMoment.format(
+            "HH:mm"
+          )} conflicts with ${block.start.toISOString()}`
+        );
+      }
+      return overlaps;
     });
 
     // Check if slot end is within business hours
-    const isWithinBusinessHours = slotEnd <= businessEndTime;
+    const slotEndMoment = moment(slotEnd).tz(timezone);
+    const isWithinBusinessHours =
+      slotEndMoment.isSameOrBefore(businessEndMoment);
 
     if (isFree && isWithinBusinessHours) {
+      console.log(`  ✅ Free slot found: ${currentTimeMoment.format("HH:mm")}`);
       freeSlots.push({
-        hour: currentTime.getHours(),
-        minute: currentTime.getMinutes(),
+        hour: currentTimeMoment.hour(),
+        minute: currentTimeMoment.minute(),
       });
     }
 
     // Move to next 30-minute slot
-    currentTime.setMinutes(currentTime.getMinutes() + 30);
+    currentTimeMoment.add(30, "minutes");
   }
 
+  console.log(`✅ Found ${freeSlots.length} free slots for ${dateStr}`);
   return freeSlots;
 }
 

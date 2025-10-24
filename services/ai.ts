@@ -235,14 +235,19 @@ export const extractEventFromText = async (
       };
     }
 
+    // Detect user's timezone automatically
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     const request: AIExtractEventRequest = {
       userId,
       messageText: messageText.trim(),
+      timezone, // Send timezone for accurate date interpretation
     };
 
     console.log("📅 Extracting event from text:", {
       userId,
       messageLength: messageText.length,
+      timezone,
     });
 
     // Execute with retry logic

@@ -304,6 +304,7 @@ export interface AIChatResponse {
 export interface AIExtractEventRequest {
   userId: string;
   messageText: string;
+  timezone?: string; // User's timezone for accurate date interpretation
 }
 
 export interface AIExtractedEvent {

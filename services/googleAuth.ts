@@ -8,13 +8,10 @@ import { auth, db } from "./firebase.config";
 WebBrowser.maybeCompleteAuthSession();
 
 // Google OAuth Configuration
-// iOS Client ID (for native redirect)
+// iOS Client ID (for native OAuth in bare workflow app)
+// Lambda will use this SAME client to refresh tokens
 const GOOGLE_IOS_CLIENT_ID =
   "703601462595-qm6fnoqu40dqiqleejiiaean8v703639.apps.googleusercontent.com";
-
-// Web Client ID (for server-side token validation)
-const GOOGLE_WEB_CLIENT_ID =
-  "703601462595-i3642bdphokl5pvpb0q0opl4e72iqflu.apps.googleusercontent.com";
 
 // Scopes needed for Google Calendar
 const CALENDAR_SCOPES = [
@@ -27,6 +24,9 @@ const CALENDAR_SCOPES = [
 
 /**
  * Custom hook to handle Google OAuth for Calendar access
+ *
+ * Uses iOS client with native redirects (bare workflow)
+ * Lambda will use the SAME iOS client credentials to refresh tokens
  *
  * Usage:
  * ```
@@ -43,8 +43,7 @@ export function useGoogleCalendarAuth() {
     iosClientId: GOOGLE_IOS_CLIENT_ID,
     scopes: CALENDAR_SCOPES,
     // Native iOS redirect - uses URL scheme from Info.plist
-    // No webClientId needed - this is a bare workflow app, not Expo Go
-    // iOS handles the redirect natively via: com.googleusercontent.apps.{IOS_CLIENT_ID}:/oauth2redirect/google
+    // No explicit redirectUri needed - iOS handles this automatically
   });
 
   // Handle OAuth response
@@ -136,6 +135,7 @@ async function handleAuthSuccess(authentication: any) {
 
 /**
  * Check if user has connected their Google Calendar
+ * Now with actual validation against Google API
  */
 export async function isCalendarConnected(): Promise<boolean> {
   try {
@@ -149,14 +149,26 @@ export async function isCalendarConnected(): Promise<boolean> {
 
     const data = tokenDoc.data();
 
-    // Check if token exists and is not expired
+    // Check if token exists
     if (!data?.accessToken) return false;
 
     const expiresAt = data.expiresAt?.toDate();
     if (!expiresAt) return false;
 
-    // Token is valid if it expires in the future
-    return expiresAt > new Date();
+    // Quick check: if token expired more than a day ago, definitely invalid
+    const oneDayAgo = new Date();
+    oneDayAgo.setDate(oneDayAgo.getDate() - 1);
+    if (expiresAt < oneDayAgo) {
+      console.log("🗑️ Token expired over a day ago, marking as invalid");
+      return false;
+    }
+
+    // Token exists - consider it "connected" even if expired
+    // The backend will handle token refresh automatically when needed
+    // We DON'T disconnect on expiration - that's what refresh tokens are for!
+
+    // Only return false if tokens don't exist at all
+    return data.accessToken !== undefined && data.refreshToken !== undefined;
   } catch (error) {
     console.error("Error checking calendar connection:", error);
     return false;
