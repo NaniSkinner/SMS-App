@@ -80,6 +80,61 @@ const UserMessageBubble = React.memo(
   }
 );
 
+// Thinking indicator component - shows while AI is processing
+const ThinkingIndicator = () => {
+  const dot1Anim = useRef(new Animated.Value(0)).current;
+  const dot2Anim = useRef(new Animated.Value(0)).current;
+  const dot3Anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createPulseAnimation = (animValue: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(animValue, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animValue, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const animations = Animated.parallel([
+      createPulseAnimation(dot1Anim, 0),
+      createPulseAnimation(dot2Anim, 200),
+      createPulseAnimation(dot3Anim, 400),
+    ]);
+
+    animations.start();
+
+    return () => animations.stop();
+  }, [dot1Anim, dot2Anim, dot3Anim]);
+
+  return (
+    <View style={styles.thinkingContainer}>
+      <View style={styles.thinkingBubble}>
+        <Ionicons
+          name="sparkles"
+          size={16}
+          color={colors.light.textSecondary}
+          style={styles.thinkingIcon}
+        />
+        <View style={styles.dotsContainer}>
+          <Animated.View style={[styles.dot, { opacity: dot1Anim }]} />
+          <Animated.View style={[styles.dot, { opacity: dot2Anim }]} />
+          <Animated.View style={[styles.dot, { opacity: dot3Anim }]} />
+        </View>
+      </View>
+    </View>
+  );
+};
+
 export default function AIChatScreen() {
   const { user } = useAuthStore();
 
@@ -89,6 +144,7 @@ export default function AIChatScreen() {
 
   // Local UI state (not persisted)
   const [inputText, setInputText] = useState("");
+  const [inputHeight, setInputHeight] = useState(40); // Track input height for auto-grow
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [checkingCalendar, setCheckingCalendar] = useState(true);
   const flatListRef = useRef<FlatList>(null);
@@ -149,6 +205,7 @@ export default function AIChatScreen() {
 
     const messageContent = inputText.trim();
     setInputText(""); // Clear input immediately for better UX
+    setInputHeight(40); // Reset input height
 
     // Get user's timezone (Chicago)
     const timezone = "America/Chicago";
@@ -160,6 +217,15 @@ export default function AIChatScreen() {
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated: true });
     }, 100);
+  };
+
+  // Handle input height changes for auto-growing text input
+  const handleContentSizeChange = (event: any) => {
+    const newHeight = event.nativeEvent.contentSize.height;
+    const MIN_HEIGHT = 40;
+    const MAX_HEIGHT = 120; // ~5 lines
+    const clampedHeight = Math.max(MIN_HEIGHT, Math.min(newHeight, MAX_HEIGHT));
+    setInputHeight(clampedHeight);
   };
 
   const handleFeedback = async (
@@ -315,6 +381,7 @@ export default function AIChatScreen() {
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           contentContainerStyle={styles.messagesList}
+          ListFooterComponent={isLoading ? <ThinkingIndicator /> : null}
           onContentSizeChange={() =>
             flatListRef.current?.scrollToEnd({ animated: true })
           }
@@ -323,15 +390,17 @@ export default function AIChatScreen() {
 
       <View style={styles.inputContainer}>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { height: inputHeight }]}
           placeholder="Ask me anything..."
           placeholderTextColor={colors.light.textTertiary}
           value={inputText}
           onChangeText={setInputText}
+          onContentSizeChange={handleContentSizeChange}
           multiline
           maxLength={1000}
           editable={!isLoading}
-          onSubmitEditing={handleSendMessage}
+          returnKeyType="default"
+          blurOnSubmit={false}
         />
         <TouchableOpacity
           style={[
@@ -403,9 +472,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 10,
     fontSize: 16,
-    maxHeight: 100,
     marginRight: 8,
     color: colors.light.textPrimary,
+    minHeight: 40,
   },
   sendButton: {
     width: 40,
@@ -516,5 +585,33 @@ const styles = StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: "600",
+  },
+  thinkingContainer: {
+    marginBottom: 12,
+    marginTop: 4,
+  },
+  thinkingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.light.messageReceived,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+  },
+  thinkingIcon: {
+    marginRight: 8,
+  },
+  dotsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.light.textSecondary,
   },
 });
