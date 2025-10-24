@@ -8,7 +8,9 @@
     "package": "npm run build && npm prune --production && zip -r function.zip dist/ node_modules/ package.json && npm install",
     "package:lite": "npm run build && rm -rf node_modules && npm install --production && zip -r function.zip dist/ node_modules/ package.json && npm install",
     "deploy": "npm run package:lite && aws s3 cp function.zip s3://messageai-lambda-deployments/function.zip --region us-east-2 && aws lambda update-function-code --function-name messageai-service --s3-bucket messageai-lambda-deployments --s3-key function.zip --region us-east-2",
-    "test": "node dist/index.js"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.914.0",
@@ -19,7 +21,10 @@
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.130",
+    "@types/jest": "^29.5.14",
     "@types/node": "^20.10.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.4.5",
     "typescript": "^5.3.0"
   },
   "engines": {

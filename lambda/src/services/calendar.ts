@@ -29,24 +29,61 @@ const PREFETCH_DEBOUNCE = 30 * 1000; // 30 seconds between prefetches for same u
 /**
  * Get OAuth2 client with user's tokens
  * Automatically refreshes token if expired
+ *
+ * ⚠️ CRITICAL: This Lambda uses iOS OAuth client credentials
+ *
+ * The app obtains tokens using native iOS OAuth (bare workflow).
+ * This Lambda MUST use the SAME iOS client credentials to refresh those tokens.
+ * If you use a different OAuth client, token refresh will fail with 'unauthorized_client'.
+ *
+ * Why iOS Client:
+ * - This is a BARE WORKFLOW app with native iOS builds
+ * - iOS clients support BOTH mobile PKCE AND server-side secret refresh
+ * - Lambda uses the iOS client secret to refresh tokens server-side
+ * - Both app and Lambda use SAME iOS client = token refresh works!
+ * - No dependency on Expo auth proxy (which doesn't work for bare workflow)
+ *
+ * OAuth Client: iOS application (native OAuth)
+ * Client ID: 703601462595-qm6fnoqu40dqiqleejiiaean8v703639.apps.googleusercontent.com
+ * Location: AWS Secrets Manager (messageai/google-oauth-credentials)
+ *
+ * See: /OAuth/IMPORTANT.md for full OAuth architecture documentation
  */
 async function getOAuthClient(userId: string) {
   try {
-    // Get OAuth credentials from Secrets Manager
+    // Get iOS OAuth credentials from Secrets Manager
+    // ⚠️ MUST be the SAME iOS client that the app uses
     const credentials = await getGoogleOAuthCredentials();
-
-    // For iOS native OAuth, we need to use the iOS client credentials
-    // The tokens were obtained using iOS client, so we must refresh with the same client
     const { client_id, client_secret } = credentials;
 
-    // Create OAuth2 client
-    // Note: redirect_uri doesn't matter for token refresh, only for initial auth
+    // Validate we're using the correct iOS client
+    const EXPECTED_IOS_CLIENT_PREFIX =
+      "703601462595-qm6fnoqu40dqiqleejiiaean8v703639";
+    if (!client_id.startsWith(EXPECTED_IOS_CLIENT_PREFIX)) {
+      console.error(`⚠️ WARNING: OAuth client mismatch detected!`);
+      console.error(`   Expected: ${EXPECTED_IOS_CLIENT_PREFIX}...`);
+      console.error(`   Got: ${client_id}`);
+      console.error(`   This will cause 'unauthorized_client' errors!`);
+      console.error(`   See OAuth/IMPORTANT.md for fix instructions.`);
+    }
+
+    // Validate client secret exists
+    if (!client_secret) {
+      console.error(`⚠️ ERROR: No client secret found!`);
+      console.error(
+        `   iOS OAuth clients have secrets for server-side token refresh.`
+      );
+      throw new Error("Missing OAuth client secret");
+    }
+
+    // Create OAuth2 client with iOS client credentials
+    // redirect_uri matches iOS URL scheme (used for initial auth, not for refresh)
     const oauth2Client = new google.auth.OAuth2(
       client_id,
       client_secret,
-      "com.googleusercontent.apps." +
-        client_id.split("-")[0] +
-        ":/oauth2redirect/google"
+      `com.googleusercontent.apps.${
+        client_id.split("-")[0]
+      }:/oauth2redirect/google`
     );
 
     // Get user's tokens from Firestore

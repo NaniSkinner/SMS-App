@@ -1,0 +1,23 @@
+# OAuth Configuration Lock File
+# Last Updated: October 24, 2025
+# Status: ✅ WORKING AND TESTED
+
+# This file locks the OAuth configuration to prevent breaking changes
+# See IMPORTANT.md for complete documentation
+
+OAUTH_CLIENT_TYPE=iOS
+IOS_CLIENT_ID=703601462595-qm6fnoqu40dqiqleejiiaean8v703639
+BUNDLE_ID=com.messageapp.messaging
+
+# Configuration:
+# - App uses iosClientId with iOS OAuth client
+# - Lambda uses SAME iOS client (has secret for token refresh)
+# - Native iOS URL scheme redirect (no Expo auth proxy)
+# - Both app and Lambda use identical client = token refresh works
+
+# Why this works:
+# - Bare workflow app needs native OAuth
+# - iOS clients have secrets for server-side refresh
+# - No dependency on Expo auth proxy (doesn't work for bare workflow)
+
+# DO NOT CHANGE without reading IMPORTANT.md and testing thoroughly

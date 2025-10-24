@@ -7,11 +7,23 @@ import { auth, db } from "./firebase.config";
 // Finish warmup for web browser
 WebBrowser.maybeCompleteAuthSession();
 
-// Google OAuth Configuration
-// iOS Client ID (for native OAuth in bare workflow app)
-// Lambda will use this SAME client to refresh tokens
+// ⚠️ CRITICAL OAUTH CONFIGURATION - DO NOT MODIFY WITHOUT READING OAuth/IMPORTANT.md
+// This app uses NATIVE iOS OAUTH with custom URL scheme redirect
+// iOS Client MUST match Lambda's AWS Secrets Manager configuration
+// See: OAuth/IMPORTANT.md for detailed explanation
+//
+// WHY iOS CLIENT (not Web):
+// - This is a BARE WORKFLOW app with native iOS builds
+// - Native apps should use native OAuth with custom URL schemes
+// - iOS clients DO have secrets for server-side use (Lambda)
+// - Both app and Lambda use SAME iOS client = token refresh works!
+// - Native redirects work perfectly in bare workflow apps
 const GOOGLE_IOS_CLIENT_ID =
   "703601462595-qm6fnoqu40dqiqleejiiaean8v703639.apps.googleusercontent.com";
+
+// iOS OAuth clients don't need an explicit redirect URI in the code
+// The redirect happens via the URL scheme registered in Info.plist
+// URL scheme: com.googleusercontent.apps.703601462595-qm6fnoqu40dqiqleejiiaean8v703639
 
 // Scopes needed for Google Calendar
 const CALENDAR_SCOPES = [
@@ -25,8 +37,30 @@ const CALENDAR_SCOPES = [
 /**
  * Custom hook to handle Google OAuth for Calendar access
  *
- * Uses iOS client with native redirects (bare workflow)
- * Lambda will use the SAME iOS client credentials to refresh tokens
+ * ⚠️ USES NATIVE iOS OAUTH with Custom URL Scheme Redirect
+ *
+ * Architecture (Bare Workflow Native):
+ * - App uses iOS OAuth client with native URL scheme redirect
+ * - Lambda uses SAME iOS client (iOS clients DO have secrets for server-side!)
+ * - Both use same client = token refresh works!
+ * - Native redirects work perfectly in bare workflow apps!
+ *
+ * Why iOS Client:
+ * - This is a BARE WORKFLOW app with native iOS builds
+ * - Native apps should use native OAuth (simpler, faster, more reliable)
+ * - iOS clients support BOTH mobile PKCE AND server-side secret refresh
+ * - No dependency on Expo auth proxy (which doesn't work for bare workflow)
+ *
+ * Why This Works:
+ * - App: Uses iosClientId → native OAuth via Info.plist URL scheme
+ * - Lambda: Uses iOS client secret → can refresh tokens server-side
+ * - Same client → Google accepts token refresh requests
+ *
+ * ⚠️ DO NOT change to Web client - requires Expo auth proxy (broken for bare workflow)!
+ * ⚠️ DO NOT change client ID without updating Lambda AWS Secrets too!
+ * ⚠️ DO NOT remove URL scheme from Info.plist!
+ *
+ * See OAuth/IMPORTANT.md for the full OAuth architecture explanation.
  *
  * Usage:
  * ```
@@ -40,10 +74,13 @@ const CALENDAR_SCOPES = [
  */
 export function useGoogleCalendarAuth() {
   const [request, response, promptAsync] = Google.useAuthRequest({
-    iosClientId: GOOGLE_IOS_CLIENT_ID,
+    iosClientId: GOOGLE_IOS_CLIENT_ID, // ⚠️ Native iOS OAuth for bare workflow
     scopes: CALENDAR_SCOPES,
-    // Native iOS redirect - uses URL scheme from Info.plist
-    // No explicit redirectUri needed - iOS handles this automatically
+    // No redirectUri needed - iOS handles via URL scheme in Info.plist automatically
+    extraParams: {
+      access_type: "offline", // Get refresh token
+      prompt: "consent", // Always get refresh token
+    },
   });
 
   // Handle OAuth response
