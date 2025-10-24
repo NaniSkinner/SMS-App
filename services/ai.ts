@@ -24,15 +24,20 @@ export const sendAIChat = async (
   conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<ApiResponse<AIChatResponse>> => {
   try {
+    // Detect user's timezone automatically
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
     const request: AIChatRequest = {
       userId,
       message: messageText, // Lambda expects "message" field
       conversationHistory,
+      timezone, // Send user's timezone to Lambda
     };
 
     console.log("🤖 Sending AI chat request:", {
       userId,
       messageLength: messageText.length,
+      timezone,
     });
 
     const response = await fetch(`${AI_API_BASE_URL}/ai/chat`, {

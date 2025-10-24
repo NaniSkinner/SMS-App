@@ -286,6 +286,7 @@ export interface AIChatRequest {
   userId: string;
   message: string; // Note: Lambda expects "message" not "messageText"
   conversationHistory?: Array<{ role: string; content: string }>;
+  timezone?: string; // IANA timezone (e.g., "America/Los_Angeles")
 }
 
 export interface AIChatResponse {

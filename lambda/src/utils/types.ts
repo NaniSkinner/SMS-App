@@ -7,6 +7,7 @@ export interface ChatRequest {
   userId: string;
   message: string;
   conversationHistory?: ConversationTurn[];
+  timezone?: string; // IANA timezone (e.g., "America/Los_Angeles")
 }
 
 export interface ChatResponse {

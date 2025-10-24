@@ -33,9 +33,30 @@ async function getClient(): Promise<OpenAI> {
 }
 
 /**
- * System prompt for the scheduling assistant
+ * Generate system prompt with current date/time context
+ * @param timezone - IANA timezone string (e.g., "America/Los_Angeles"), defaults to UTC
  */
-const SYSTEM_PROMPT = `You are a helpful scheduling assistant for busy parents.
+function getSystemPrompt(timezone: string = "UTC"): string {
+  const now = new Date();
+
+  // Format date and time in the user's timezone
+  const dateStr = now.toLocaleDateString("en-US", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: timezone,
+  });
+  const timeStr = now.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+    timeZone: timezone,
+  });
+
+  return `You are a helpful scheduling assistant for busy parents.
+
+CURRENT DATE AND TIME: ${dateStr} at ${timeStr}
 
 Your capabilities:
 - Check calendar events
@@ -51,11 +72,13 @@ Guidelines:
 5. Prioritize user's explicit preferences
 6. Default to 1-hour duration if not specified
 7. Use 12-hour time format (3 PM, not 15:00)
+8. When user says "today", "tomorrow", "next week", use the CURRENT DATE above as reference
 
 When you detect a conflict:
 - Explain what conflicts
 - Mention when the conflict is
 - Suggest alternatives`;
+}
 
 /**
  * Simple chat completion (no function calling)
@@ -63,13 +86,14 @@ When you detect a conflict:
  */
 export async function simpleChatCompletion(
   userMessage: string,
-  conversationHistory?: ConversationTurn[]
+  conversationHistory?: ConversationTurn[],
+  timezone: string = "UTC"
 ): Promise<string> {
   try {
     const client = await getClient();
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: getSystemPrompt(timezone) },
     ];
 
     // Add conversation history if provided
@@ -134,13 +158,14 @@ export async function simpleChatCompletion(
 export async function chatWithFunctions(
   userMessage: string,
   conversationHistory?: ConversationTurn[],
-  tools?: OpenAI.Chat.ChatCompletionTool[]
+  tools?: OpenAI.Chat.ChatCompletionTool[],
+  timezone: string = "UTC"
 ): Promise<OpenAI.Chat.ChatCompletionMessage> {
   try {
     const client = await getClient();
 
     const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
-      { role: "system", content: SYSTEM_PROMPT },
+      { role: "system", content: getSystemPrompt(timezone) },
     ];
 
     // Add conversation history

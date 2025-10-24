@@ -19,7 +19,7 @@ import { findAlternativeTimes } from "./helpers";
  */
 interface Tool {
   definition: OpenAI.Chat.ChatCompletionTool;
-  handler: (args: any, userId: string) => Promise<any>;
+  handler: (args: any, userId: string, timezone?: string) => Promise<any>;
 }
 
 /**
@@ -54,11 +54,12 @@ const getCalendarEvents: Tool = {
 
   handler: async (
     args: { startDate: string; endDate: string },
-    userId: string
+    userId: string,
+    timezone: string = "UTC"
   ) => {
     try {
       console.log(
-        `📅 Tool: getCalendarEvents for ${args.startDate} to ${args.endDate}`
+        `📅 Tool: getCalendarEvents for ${args.startDate} to ${args.endDate} (timezone: ${timezone})`
       );
 
       // Validate dates
@@ -77,7 +78,7 @@ const getCalendarEvents: Tool = {
       // Fetch events from Google Calendar
       const events = await listCalendarEvents(userId, startDate, endDate);
 
-      // Format for OpenAI
+      // Format for OpenAI - using user's timezone
       const formattedEvents = events.map((event: calendar_v3.Schema$Event) => {
         const start = event.start?.dateTime
           ? new Date(event.start.dateTime)
@@ -92,6 +93,7 @@ const getCalendarEvents: Tool = {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: false,
+                timeZone: timezone,
               })
             : "Unknown",
           endTime: end
@@ -99,6 +101,7 @@ const getCalendarEvents: Tool = {
                 hour: "2-digit",
                 minute: "2-digit",
                 hour12: false,
+                timeZone: timezone,
               })
             : "Unknown",
           location: event.location || null,
@@ -199,7 +202,8 @@ const createCalendarEvent_Tool: Tool = {
       description?: string;
       location?: string;
     },
-    userId: string
+    userId: string,
+    timezone: string = "UTC"
   ) => {
     try {
       console.log(`📝 Tool: createCalendarEvent - "${args.title}"`);
@@ -293,11 +297,12 @@ const detectConflicts_Tool: Tool = {
       duration?: number;
       title?: string;
     },
-    userId: string
+    userId: string,
+    timezone: string = "UTC"
   ) => {
     try {
       console.log(
-        `🔍 Tool: detectConflicts for ${args.date} at ${args.startTime}`
+        `🔍 Tool: detectConflicts for ${args.date} at ${args.startTime} (timezone: ${timezone})`
       );
 
       const duration = args.duration || 60;
@@ -318,13 +323,36 @@ const detectConflicts_Tool: Tool = {
         };
       }
 
-      // Format conflicts
-      const conflicts = result.conflicts.map((c) => ({
-        title: c.event.summary || "Untitled Event",
-        start: c.event.start?.dateTime,
-        end: c.event.end?.dateTime,
-        overlapMinutes: c.overlapMinutes,
-      }));
+      // Format conflicts - using user's timezone
+      const conflicts = result.conflicts.map((c) => {
+        const start = c.event.start?.dateTime
+          ? new Date(c.event.start.dateTime)
+          : null;
+        const end = c.event.end?.dateTime
+          ? new Date(c.event.end.dateTime)
+          : null;
+
+        return {
+          title: c.event.summary || "Untitled Event",
+          start: start
+            ? start.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+                timeZone: timezone,
+              })
+            : "Unknown",
+          end: end
+            ? end.toLocaleTimeString("en-US", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: false,
+                timeZone: timezone,
+              })
+            : "Unknown",
+          overlapMinutes: c.overlapMinutes,
+        };
+      });
 
       console.log(`⚠️ Found ${conflicts.length} conflicts`);
 
@@ -382,7 +410,8 @@ export function getToolDefinitions(): OpenAI.Chat.ChatCompletionTool[] {
 export async function executeTool(
   toolName: string,
   args: any,
-  userId: string
+  userId: string,
+  timezone: string = "UTC"
 ): Promise<any> {
   const tool = TOOLS[toolName];
 
@@ -390,6 +419,6 @@ export async function executeTool(
     throw new Error(`Unknown tool: ${toolName}`);
   }
 
-  console.log(`🔧 Executing tool: ${toolName}`);
-  return await tool.handler(args, userId);
+  console.log(`🔧 Executing tool: ${toolName} (timezone: ${timezone})`);
+  return await tool.handler(args, userId, timezone);
 }

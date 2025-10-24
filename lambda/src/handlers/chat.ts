@@ -39,6 +39,10 @@ export async function handleChat(
 
     console.log(`📨 User ${request.userId}: "${request.message}"`);
 
+    // Get timezone from request or default to America/Los_Angeles
+    const timezone = request.timezone || "America/Los_Angeles";
+    console.log(`🌍 Using timezone: ${timezone}`);
+
     // Get tool definitions for OpenAI
     const tools = getToolDefinitions();
 
@@ -69,7 +73,8 @@ export async function handleChat(
     let response = await chatWithFunctions(
       request.message,
       request.conversationHistory,
-      tools
+      tools,
+      timezone
     );
 
     const MAX_ITERATIONS = 5; // Prevent infinite loops
@@ -100,11 +105,12 @@ export async function handleChat(
         toolsCalled.push(toolName);
 
         try {
-          // Execute the tool
+          // Execute the tool with user's timezone
           const toolResult = await executeTool(
             toolName,
             toolArgs,
-            request.userId
+            request.userId,
+            timezone
           );
 
           console.log(`✅ Tool result:`, toolResult);
