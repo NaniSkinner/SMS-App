@@ -280,6 +280,11 @@ export interface AIChatMessage {
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  // AI-specific fields (only for assistant messages)
+  reasoning?: string[];
+  toolsCalled?: string[];
+  events?: any[];
+  feedback?: "positive" | "negative" | null;
 }
 
 export interface AIChatRequest {

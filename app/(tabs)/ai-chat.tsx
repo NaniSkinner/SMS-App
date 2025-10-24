@@ -3,6 +3,7 @@
  * Simple interface to test AI chat functionality with GPT-4o
  */
 
+import { AIMessageBubble } from "@/components/chat/AIMessageBubble";
 import { sendAIChat } from "@/services/ai";
 import {
   isCalendarConnected,
@@ -16,6 +17,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -25,6 +27,57 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
+// User message bubble component - defined outside to prevent re-creation
+const UserMessageBubble = React.memo(
+  ({ message }: { message: AIChatMessage }) => {
+    const fadeAnim = useRef(new Animated.Value(0)).current;
+    const slideAnim = useRef(new Animated.Value(20)).current;
+    const [hasAnimated, setHasAnimated] = useState(false);
+
+    useEffect(() => {
+      // Only animate once per message
+      if (!hasAnimated) {
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 300,
+            useNativeDriver: true,
+          }),
+        ]).start();
+        setHasAnimated(true);
+      }
+    }, [hasAnimated, fadeAnim, slideAnim]);
+
+    return (
+      <Animated.View
+        style={[
+          styles.messageBubble,
+          styles.userBubble,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
+      >
+        <Text style={[styles.messageText, styles.userText]}>
+          {message.content}
+        </Text>
+        <Text style={[styles.timestampText, styles.userTimestamp]}>
+          {message.timestamp.toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </Text>
+      </Animated.View>
+    );
+  }
+);
 
 export default function AIChatScreen() {
   const { user } = useAuthStore();
@@ -119,6 +172,9 @@ export default function AIChatScreen() {
           role: "assistant",
           content: response.data.reply,
           timestamp: new Date(),
+          reasoning: response.data.reasoning,
+          toolsCalled: response.data.toolsCalled,
+          events: response.data.events,
         };
 
         setMessages((prev) => [...prev, aiMessage]);
@@ -151,34 +207,66 @@ export default function AIChatScreen() {
     }
   };
 
-  const renderMessage = ({ item }: { item: AIChatMessage }) => {
+  const handleFeedback = async (
+    messageId: string,
+    sentiment: "positive" | "negative"
+  ) => {
+    console.log(`📊 Feedback submitted for message ${messageId}: ${sentiment}`);
+
+    // Update local state to reflect feedback
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, feedback: sentiment } : msg
+      )
+    );
+
+    // TODO: Save feedback to Firestore in Epic 1.5
+    // await firestore.collection("ai_feedback").add({
+    //   userId: user?.id,
+    //   messageId,
+    //   sentiment,
+    //   timestamp: new Date(),
+    // });
+  };
+
+  // Detect if message is event-related (for showing feedback)
+  const isEventRelated = (message: AIChatMessage): boolean => {
+    if (message.role !== "assistant") return false;
+
+    // ONLY show feedback if the AI actually performed an event action:
+    // 1. Tool calls include createCalendarEvent, updateCalendarEvent, or deleteCalendarEvent
+    const hasEventActionTools = message.toolsCalled?.some(
+      (tool) =>
+        tool.includes("createCalendarEvent") ||
+        tool.includes("updateCalendarEvent") ||
+        tool.includes("deleteCalendarEvent")
+    );
+
+    return hasEventActionTools || false;
+  };
+
+  const renderMessage = ({
+    item,
+    index,
+  }: {
+    item: AIChatMessage;
+    index: number;
+  }) => {
     const isUser = item.role === "user";
 
-    return (
-      <View
-        style={[
-          styles.messageBubble,
-          isUser ? styles.userBubble : styles.aiBubble,
-        ]}
-      >
-        <Text
-          style={[styles.messageText, isUser ? styles.userText : styles.aiText]}
-        >
-          {item.content}
-        </Text>
-        <Text
-          style={[
-            styles.timestampText,
-            isUser ? styles.userTimestamp : styles.aiTimestamp,
-          ]}
-        >
-          {item.timestamp.toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </Text>
-      </View>
-    );
+    // Use enhanced AI bubble for assistant messages
+    if (!isUser) {
+      return (
+        <AIMessageBubble
+          message={item}
+          onFeedback={handleFeedback}
+          showFeedback={isEventRelated(item)}
+        />
+      );
+    }
+
+    // Simple bubble for user messages with animation
+    return <UserMessageBubble message={item} />;
   };
 
   const renderEmptyState = () => (
@@ -305,15 +393,12 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
     padding: 12,
     borderRadius: 16,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   userBubble: {
     alignSelf: "flex-end",
     backgroundColor: colors.primary,
-  },
-  aiBubble: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.light.messageReceived,
+    borderBottomRightRadius: 4,
   },
   messageText: {
     fontSize: 16,
@@ -321,9 +406,6 @@ const styles = StyleSheet.create({
   },
   userText: {
     color: colors.light.textInverse,
-  },
-  aiText: {
-    color: colors.light.textPrimary,
   },
   timestampText: {
     fontSize: 11,
@@ -333,10 +415,6 @@ const styles = StyleSheet.create({
     color: colors.light.textInverse,
     opacity: 0.7,
     textAlign: "right",
-  },
-  aiTimestamp: {
-    color: colors.light.textSecondary,
-    textAlign: "left",
   },
   inputContainer: {
     flexDirection: "row",

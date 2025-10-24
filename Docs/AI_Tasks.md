@@ -3,11 +3,23 @@
 ## 📊 Overall Progress
 
 **Messaging App MVP:** ✅ 100% Complete (83/83 tasks)  
-**AI Features:** 🚧 40/200+ tasks (20%)  
-**Phase 0 (Foundation):** ✅ 100% COMPLETE! All systems operational 🎉
+**AI Features:** 🚧 47/200+ tasks (23%)  
+**Phase 0 (Foundation):** ✅ 100% COMPLETE! All systems operational 🎉  
+**Phase 1 (Epic 1.1.4):** ✅ COMPLETE! Enhanced AI Chat UI with animations and feedback
 
 ### Completed Tasks (Latest First)
 
+- **2025-10-24:** ✅ **Bug Fix!** Fixed feedback buttons showing on every message (now only on createEvent actions)
+- **2025-10-24:** ✅ **Bug Fix!** Fixed flickering by moving UserMessageBubble outside component & preventing re-animation
+- **2025-10-24:** ✅ Made feedback detection strict - only show when AI creates/updates/deletes events
+- **2025-10-24:** ✅ **UX Improvements!** Removed technical details (reasoning/tool calls) - cleaner user experience
+- **2025-10-24:** ✅ Made feedback buttons conditional - only show for event-related responses
+- **2025-10-24:** ✅ **Epic 1.1.4 COMPLETE!** Enhanced AI message bubbles with events and conditional feedback
+- **2025-10-24:** ✅ Created AIMessageBubble component (simplified, user-focused - 240 lines)
+- **2025-10-24:** ✅ Added smart feedback detection (only for creating/scheduling events)
+- **2025-10-24:** ✅ Added fade-in animations to all message bubbles (300ms smooth transitions)
+- **2025-10-24:** ✅ Updated AIChatMessage types to include reasoning, toolsCalled, events, feedback
+- **2025-10-24:** ✅ AI Chat now displays all relevant data from Lambda API
 - **2025-10-24:** 🎉 **PHASE 0 COMPLETE!** Fixed timezone bugs, conflict detection working perfectly
 - **2025-10-24:** ✅ Fixed timezone handling in event creation (Chicago timezone)
 - **2025-10-24:** ✅ Fixed timezone comparison in conflict detection algorithm
@@ -88,24 +100,27 @@
 ### Current Status
 
 **🎉 PHASE 0 COMPLETE!** All foundation systems operational  
-**Working on:** Ready to begin Phase 1 (AI Chat UI Polish)  
-**Completed:** Phase 0 ✅ 100% - All 4 Epics Complete!  
-**Next up:** Phase 1 - AI Chat Assistant UI Implementation  
+**🎉 PHASE 1 - Epic 1.1.4 COMPLETE!** Enhanced AI Chat UI with animations and feedback  
+**Completed:** Phase 0 ✅ 100% - All 4 Epics Complete + Epic 1.1.4 ✅ 100%  
+**Next up:** Phase 1 - Epic 1.5 (Firestore Integration) & Epic 1.2 (AI Store)  
 **Files created:**
 
 - Backend: `/lambda/src/` (modular structure: services/, handlers/, utils/, tools/)
   - `/lambda/src/services/calendar.ts` (530 lines - full CRUD + conflict detection)
   - `/lambda/src/tools/registry.ts` (396 lines - 3 function tools with handlers)
   - `/lambda/src/tools/helpers.ts` (231 lines - alternative time finder)
-  - UPDATED: `/lambda/src/handlers/chat.ts` (203 lines - multi-turn orchestration)
-  - UPDATED: `/lambda/src/services/openai.ts` (309 lines - added chatWithMessagesAndTools)
+  - UPDATED: `/lambda/src/handlers/chat.ts` (209 lines - multi-turn orchestration)
+  - UPDATED: `/lambda/src/services/openai.ts` (334 lines - added chatWithMessagesAndTools)
 - Frontend: `/services/ai.ts`, `/app/(tabs)/ai-chat.tsx`, `/types/index.ts` (AI types)
   - `/services/googleAuth.ts` (226 lines - OAuth hook + token management, bare workflow)
+  - NEW: `/components/chat/AIMessageBubble.tsx` (276 lines - enhanced AI message display)
+  - UPDATED: `/app/(tabs)/ai-chat.tsx` (513 lines - with animations and conditional feedback)
+  - UPDATED: `/types/index.ts` (322 lines - added reasoning, toolsCalled, events, feedback fields)
 - Documentation: `/IMPORTANT.md` (396 lines - OAuth configuration reference)
 
 ### Quick Stats
 
-- **Lines of code added:** ~3,300+ (Lambda: ~2,400 + React Native: ~900 + Docs: ~400)
+- **Lines of code added:** ~4,100+ (Lambda: ~2,400 + React Native: ~1,300 + Docs: ~400)
 - **AWS Resources created:**
   - Lambda function + API Gateway (4 endpoints)
   - 3 AWS Secrets (OpenAI key, Firebase Admin SDK, Google OAuth)
@@ -117,23 +132,26 @@
   - OAuth Consent Screen configured
   - Google Calendar API enabled
 - **Lambda files created:**
-  - Tools registry: `lambda/src/tools/registry.ts` (396 lines)
+  - Tools registry: `lambda/src/tools/registry.ts` (425 lines)
   - Alternative time finder: `lambda/src/tools/helpers.ts` (231 lines)
-  - Chat handler (updated): `lambda/src/handlers/chat.ts` (203 lines)
-  - OpenAI service (updated): `lambda/src/services/openai.ts` (309 lines)
-  - Calendar service: `lambda/src/services/calendar.ts` (453 lines)
-- **React Native files created:**
-  - AI service layer: `services/ai.ts` (140 lines)
-  - AI Chat screen: `app/(tabs)/ai-chat.tsx` (302 lines)
+  - Chat handler: `lambda/src/handlers/chat.ts` (209 lines)
+  - OpenAI service: `lambda/src/services/openai.ts` (334 lines)
+  - Calendar service: `lambda/src/services/calendar.ts` (488 lines)
+- **React Native files created/updated:**
+  - AI service layer: `services/ai.ts` (145 lines)
+  - AI Chat screen: `app/(tabs)/ai-chat.tsx` (513 lines - with animations & conditional feedback)
+  - AI Message Bubble: `components/chat/AIMessageBubble.tsx` (276 lines - NEW!)
   - Google Auth service: `services/googleAuth.ts` (226 lines)
-  - AI types: Added to `types/index.ts` (40+ lines)
+  - AI types: Updated `types/index.ts` (322 lines - added AI fields)
 - **Documentation:**
   - IMPORTANT.md: OAuth configuration reference (396 lines)
-- **Time invested:** ~10.5 hours (Epic 0.1: 2.5hrs + Epic 0.2: 4hrs + Epic 0.2.3: 1.5hrs + OAuth Setup/Fix: 2.5hrs)
+- **Time invested:** ~12 hours (Epic 0.1: 2.5hrs + Epic 0.2: 4hrs + Epic 0.2.3: 1.5hrs + OAuth Setup/Fix: 2.5hrs + Epic 1.1.4: 1.5hrs)
 - **API Gateway URL:** https://ouydtx31yk.execute-api.us-east-2.amazonaws.com/staging
 - **S3 Deployment Bucket:** messageai-lambda-deployments
 - **Epic 0.1:** ✅ COMPLETE
 - **Epic 0.2:** ✅ COMPLETE (Backend + Frontend + Function Calling!)
+- **Epic 0.3:** ✅ COMPLETE (Google Calendar OAuth + CRUD operations)
+- **Epic 1.1.4:** ✅ COMPLETE (Enhanced AI Chat UI with animations & feedback)
 
 ---
 
@@ -1252,109 +1270,115 @@ lambda/src/
   - **Time:** 20 minutes
   - **Acceptance:** Loading state displays
 
-#### Task 1.1.4: Message Bubble Components
+#### Task 1.1.4: Message Bubble Components ✅ COMPLETE
 
-- [ ] **1.1.4.1** Create user message bubble
+- [x] **1.1.4.1** Create user message bubble
 
-  ```typescript
-  // components/ai-chat/UserMessageBubble.tsx
-  export function UserMessageBubble({ message }: Props) {
-    return (
-      <View style={styles.userBubble}>
-        <Text style={styles.userText}>{message.content}</Text>
-        <Text style={styles.timestamp}>{formatTime(message.timestamp)}</Text>
-      </View>
-    );
-  }
-  ```
+  - ✅ Right-aligned blue background with white text
+  - ✅ Rounded corners with custom bottom-right radius
+  - ✅ Implemented with animation (fade + slide from right)
+  - ✅ **Time:** 45 minutes (actual - with animation)
+  - ✅ **Status:** COMPLETE
+  - **File:** Integrated into `app/(tabs)/ai-chat.tsx` (UserMessageBubble component)
 
-  - Right-aligned
-  - Blue background (#007AFF)
-  - White text
-  - Rounded corners
-  - **Time:** 30 minutes
-  - **Acceptance:** User messages display correctly
+- [x] **1.1.4.2** Create AI message bubble
 
-- [ ] **1.1.4.2** Create AI message bubble
+  - ✅ Created `components/chat/AIMessageBubble.tsx` (276 lines)
+  - ✅ Left-aligned with sparkles icon (✨)
+  - ✅ Light gray background
+  - ✅ Displays message content + timestamp
+  - ✅ Conditional feedback buttons (only for event actions)
+  - ✅ Event cards with calendar icon
+  - ✅ **Time:** 1 hour (actual)
+  - ✅ **Status:** COMPLETE
+  - **Note:** Removed reasoning/tool calls display per UX feedback - cleaner interface
 
-  ```typescript
-  // components/ai-chat/AIMessageBubble.tsx
-  export function AIMessageBubble({ message }: Props) {
-    return (
-      <View style={styles.aiBubble}>
-        <View style={styles.aiIcon}>🤖</View>
-        <View style={styles.aiContent}>
-          <Text style={styles.aiText}>{message.content}</Text>
-          {message.reasoning && (
-            <CollapsibleReasoning reasoning={message.reasoning} />
-          )}
-          {message.events && <EventList events={message.events} />}
-          <FeedbackButtons messageId={message.id} />
-        </View>
-      </View>
-    );
-  }
-  ```
+- [x] **1.1.4.3** Create collapsible reasoning section
 
-  - Left-aligned
-  - Light gray background
-  - Black text (light mode), white text (dark mode)
-  - Robot icon
-  - **Time:** 45 minutes
-  - **Acceptance:** AI messages display with all sections
+  - ✅ Initially implemented with collapsible UI
+  - ✅ **Status:** COMPLETE but REMOVED per user feedback
+  - **Reason:** Technical details not useful to end users
+  - **Time:** 30 minutes (then removed for UX)
 
-- [ ] **1.1.4.3** Create collapsible reasoning section
+- [x] **1.1.4.4** Create event list component
 
-  - Initially collapsed
-  - Tap "How I figured this out" to expand
-  - Shows AI's thought process
-  - **Time:** 30 minutes
-  - **Acceptance:** Can expand/collapse reasoning
+  - ✅ Event cards display in AIMessageBubble
+  - ✅ Shows title, date/time, location
+  - ✅ Blue left border accent
+  - ✅ Calendar icon header
+  - ✅ **Time:** 30 minutes (actual)
+  - ✅ **Status:** COMPLETE
 
-- [ ] **1.1.4.4** Create event list component
+- [x] **1.1.4.5** Create feedback buttons
 
-  ```typescript
-  // components/ai-chat/EventList.tsx
-  export function EventList({ events }: Props) {
-    return (
-      <View style={styles.eventList}>
-        {events.map((event) => (
-          <EventCard key={event.id} event={event} />
-        ))}
-      </View>
-    );
-  }
-  ```
+  - ✅ Thumbs up / thumbs down with haptic feedback
+  - ✅ **Conditional display** - only shows when AI creates/updates/deletes events
+  - ✅ Prevents duplicate feedback submission
+  - ✅ Shows "Thanks for your feedback!" message
+  - ✅ **Time:** 45 minutes (actual - with conditional logic)
+  - ✅ **Status:** COMPLETE
 
-  - Shows calendar events in structured format
-  - Time, title, location
-  - **Time:** 30 minutes
-  - **Acceptance:** Events display formatted
+- [x] **1.1.4.6** Add message animations
+  - ✅ Fade in + slide animation (300ms)
+  - ✅ User messages slide from right
+  - ✅ AI messages slide from left
+  - ✅ Fixed flickering issue with React.memo and hasAnimated state
+  - ✅ **Time:** 45 minutes (actual - including bug fixes)
+  - ✅ **Status:** COMPLETE
 
-- [ ] **1.1.4.5** Create feedback buttons
+**Epic 1.1.4 Total Time:** 3.5 hours (actual: 3 hours 45 minutes)
 
-  ```typescript
-  <View style={styles.feedbackButtons}>
-    <TouchableOpacity onPress={() => submitFeedback("helpful")}>
-      <Text>👍</Text>
-    </TouchableOpacity>
-    <TouchableOpacity onPress={() => submitFeedback("not_helpful")}>
-      <Text>👎</Text>
-    </TouchableOpacity>
-  </View>
-  ```
+---
 
-  - Thumbs up / thumbs down
-  - Haptic feedback on tap
-  - **Time:** 20 minutes
-  - **Acceptance:** Feedback can be submitted
+## 🎉 Epic 1.1.4 Completion Summary
 
-- [ ] **1.1.4.6** Add message animations
-  - Fade in + slide animation (200ms)
-  - User messages slide from right
-  - AI messages slide from left
-  - **Time:** 30 minutes
-  - **Acceptance:** Smooth animations
+**Completed:** October 24, 2025  
+**Total Time:** 3 hours 45 minutes  
+**Status:** ✅ COMPLETE
+
+### What Was Built:
+
+1. **AIMessageBubble Component** (`components/chat/AIMessageBubble.tsx` - 276 lines)
+
+   - Clean, user-focused design (removed technical details per UX feedback)
+   - Sparkles icon (✨) for AI branding
+   - Conditional feedback buttons (only for event creation/modification)
+   - Event cards with calendar display
+   - Smooth fade-in animations (300ms)
+
+2. **UserMessageBubble Component** (integrated in `ai-chat.tsx`)
+
+   - Blue right-aligned bubbles
+   - Fade + slide animation from right
+   - Memoized to prevent flickering
+
+3. **Enhanced AI Chat Screen** (`app/(tabs)/ai-chat.tsx` - 513 lines)
+
+   - Updated to use new message bubble components
+   - Smart feedback detection (only shows for event actions)
+   - Fixed flickering bug by moving component outside & preventing re-animation
+   - Captures all relevant data from Lambda API
+
+4. **Updated TypeScript Types** (`types/index.ts`)
+   - Added `reasoning`, `toolsCalled`, `events`, `feedback` fields to `AIChatMessage`
+
+### Key UX Decisions:
+
+- ❌ **Removed** "Used: getCalendarEvents" badges (too technical)
+- ❌ **Removed** "How I figured this out" reasoning sections (not valuable to users)
+- ✅ **Kept** event cards and calendar information (useful)
+- ✅ **Made feedback conditional** - only shows when AI creates/updates/deletes events
+- ✅ **Fixed flickering** - blue bubbles stay stable while typing
+
+### Testing Results:
+
+- ✅ No feedback buttons on simple queries ("Hello", "What's on my calendar?")
+- ✅ Feedback buttons appear when creating events ("Book Friday at 3 PM")
+- ✅ No flickering when typing new messages
+- ✅ Smooth animations on all message bubbles
+- ✅ Clean, polished UI without technical clutter
+
+---
 
 #### Task 1.1.5: Message Input Component
 
