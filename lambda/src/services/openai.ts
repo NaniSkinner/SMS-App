@@ -201,6 +201,59 @@ export async function chatWithFunctions(
 }
 
 /**
+ * Chat completion with messages array and tools
+ * For multi-turn orchestration where we need full control over the messages
+ */
+export async function chatWithMessagesAndTools(
+  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  tools?: OpenAI.Chat.ChatCompletionTool[]
+): Promise<OpenAI.Chat.ChatCompletionMessage> {
+  try {
+    const client = await getClient();
+
+    console.log(`🤖 Calling OpenAI with ${messages.length} messages and tools`);
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages,
+      tools,
+      tool_choice: "auto",
+      temperature: 0.7,
+      max_tokens: 1500,
+    });
+
+    const message = response.choices[0]?.message;
+
+    if (!message) {
+      throw new AppError("No response from OpenAI", 500, "NO_RESPONSE");
+    }
+
+    console.log("✅ OpenAI response received");
+    if (message.tool_calls) {
+      console.log(`🔧 Function calls requested: ${message.tool_calls.length}`);
+    }
+
+    return message;
+  } catch (error: any) {
+    console.error("❌ OpenAI API error:", error);
+
+    if (error.code === "rate_limit_exceeded") {
+      throw new AppError(
+        "AI assistant is busy. Please try again in a moment.",
+        429,
+        "RATE_LIMIT_EXCEEDED"
+      );
+    }
+
+    throw new AppError(
+      `OpenAI API error: ${error.message}`,
+      500,
+      "OPENAI_API_ERROR"
+    );
+  }
+}
+
+/**
  * Extract event information from text
  */
 export async function extractEventFromText(messageText: string): Promise<any> {

@@ -30,6 +30,9 @@ services/firebase.config.ts
 .env.*.local
 .env.aws
 
+# OAuth configuration documentation (contains actual credentials for development)
+IMPORTANT.md
+
 # Logs
 logs
 *.log

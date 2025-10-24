@@ -25,13 +25,20 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 async function getOAuthClient(userId: string) {
   try {
     // Get OAuth credentials from Secrets Manager
-    const { client_id, client_secret } = await getGoogleOAuthCredentials();
+    const credentials = await getGoogleOAuthCredentials();
+
+    // For iOS native OAuth, we need to use the iOS client credentials
+    // The tokens were obtained using iOS client, so we must refresh with the same client
+    const { client_id, client_secret } = credentials;
 
     // Create OAuth2 client
+    // Note: redirect_uri doesn't matter for token refresh, only for initial auth
     const oauth2Client = new google.auth.OAuth2(
       client_id,
       client_secret,
-      "https://auth.expo.io/@naniskinner/messageapp" // redirect URI (not used server-side)
+      "com.googleusercontent.apps." +
+        client_id.split("-")[0] +
+        ":/oauth2redirect/google"
     );
 
     // Get user's tokens from Firestore
