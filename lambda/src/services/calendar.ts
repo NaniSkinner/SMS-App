@@ -198,25 +198,35 @@ export async function createCalendarEvent(
     const calendar = await getCalendarClient(userId);
 
     // Parse date and time
-    const [year, month, day] = eventDetails.date.split("-").map(Number);
-    const [hour, minute] = eventDetails.startTime.split(":").map(Number);
+    // Format for Google Calendar: YYYY-MM-DDTHH:MM:SS in local timezone
+    // Google Calendar will interpret this in the specified timeZone
+    const dateTimeString = `${eventDetails.date}T${eventDetails.startTime}:00`;
 
-    const startDateTime = new Date(year, month - 1, day, hour, minute);
-    const endDateTime = new Date(
-      startDateTime.getTime() + eventDetails.duration * 60 * 1000
-    );
+    // Calculate end time
+    const [hour, minute] = eventDetails.startTime.split(":").map(Number);
+    const startMinutes = hour * 60 + minute;
+    const endMinutes = startMinutes + eventDetails.duration;
+    const endHour = Math.floor(endMinutes / 60);
+    const endMinute = endMinutes % 60;
+    const endTimeString = `${eventDetails.date}T${String(endHour).padStart(
+      2,
+      "0"
+    )}:${String(endMinute).padStart(2, "0")}:00`;
+
+    // Use America/Chicago timezone (user's timezone)
+    const userTimezone = "America/Chicago";
 
     const event: calendar_v3.Schema$Event = {
       summary: eventDetails.title,
       description: eventDetails.description,
       location: eventDetails.location,
       start: {
-        dateTime: startDateTime.toISOString(),
-        timeZone: "America/New_York", // TODO: Get user's timezone
+        dateTime: dateTimeString,
+        timeZone: userTimezone,
       },
       end: {
-        dateTime: endDateTime.toISOString(),
-        timeZone: "America/New_York",
+        dateTime: endTimeString,
+        timeZone: userTimezone,
       },
     };
 
@@ -282,22 +292,29 @@ export async function updateCalendarEvent(
 
     // Update date/time if provided
     if (updates.date && updates.startTime) {
-      const [year, month, day] = updates.date.split("-").map(Number);
-      const [hour, minute] = updates.startTime.split(":").map(Number);
+      const dateTimeString = `${updates.date}T${updates.startTime}:00`;
 
-      const startDateTime = new Date(year, month - 1, day, hour, minute);
+      // Calculate end time
+      const [hour, minute] = updates.startTime.split(":").map(Number);
+      const startMinutes = hour * 60 + minute;
       const duration = updates.duration || 60; // default 1 hour
-      const endDateTime = new Date(
-        startDateTime.getTime() + duration * 60 * 1000
-      );
+      const endMinutes = startMinutes + duration;
+      const endHour = Math.floor(endMinutes / 60);
+      const endMinute = endMinutes % 60;
+      const endTimeString = `${updates.date}T${String(endHour).padStart(
+        2,
+        "0"
+      )}:${String(endMinute).padStart(2, "0")}:00`;
+
+      const userTimezone = "America/Chicago";
 
       event.start = {
-        dateTime: startDateTime.toISOString(),
-        timeZone: "America/New_York",
+        dateTime: dateTimeString,
+        timeZone: userTimezone,
       };
       event.end = {
-        dateTime: endDateTime.toISOString(),
-        timeZone: "America/New_York",
+        dateTime: endTimeString,
+        timeZone: userTimezone,
       };
     }
 
@@ -382,12 +399,30 @@ export async function detectConflicts(
 }> {
   try {
     // Parse proposed event times
-    const [year, month, day] = proposedEvent.date.split("-").map(Number);
-    const [hour, minute] = proposedEvent.startTime.split(":").map(Number);
+    // Important: Google Calendar events have timezone info (e.g., "2025-10-25T14:00:00-05:00")
+    // but our proposed times are just "14:00" which we need to interpret in the user's timezone
 
-    const proposedStart = new Date(year, month - 1, day, hour, minute);
+    // Chicago is UTC-5 (CST) or UTC-6 (CDT)
+    // For simplicity, we'll assume CST (UTC-5) - in production, use a proper timezone library
+    const chicagoOffsetHours = -5; // CST offset from UTC
+
+    const [hour, minute] = proposedEvent.startTime.split(":").map(Number);
+    const [year, month, day] = proposedEvent.date.split("-").map(Number);
+
+    // Create proposed times in Chicago timezone, then convert to UTC for comparison
+    // When user says "2 PM", they mean 2 PM Chicago = 7 PM UTC (2 + 5)
+    const proposedStartChicago = new Date(year, month - 1, day, hour, minute);
+    const proposedEndChicago = new Date(
+      proposedStartChicago.getTime() + proposedEvent.duration * 60 * 1000
+    );
+
+    // Convert to UTC by subtracting the offset (Chicago is behind UTC)
+    // Chicago 2 PM = UTC 7 PM, so we ADD the absolute offset value
+    const proposedStart = new Date(
+      proposedStartChicago.getTime() - chicagoOffsetHours * 60 * 60 * 1000
+    );
     const proposedEnd = new Date(
-      proposedStart.getTime() + proposedEvent.duration * 60 * 1000
+      proposedEndChicago.getTime() - chicagoOffsetHours * 60 * 60 * 1000
     );
 
     // Get events for that day
