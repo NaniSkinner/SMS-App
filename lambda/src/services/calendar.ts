@@ -60,13 +60,33 @@ async function getOAuthClient(userId: string) {
     }
 
     // Set credentials
+    // Handle Firestore Timestamp conversion properly
+    let expiryTimestamp: number | undefined;
+    if (tokenData.expiresAt) {
+      // Firebase Admin SDK stores dates as Firestore Timestamp objects
+      if (typeof tokenData.expiresAt.toDate === "function") {
+        // It's a Firestore Timestamp
+        expiryTimestamp = tokenData.expiresAt.toDate().getTime();
+      } else if (tokenData.expiresAt._seconds) {
+        // Legacy format with _seconds
+        expiryTimestamp = tokenData.expiresAt._seconds * 1000;
+      } else if (tokenData.expiresAt instanceof Date) {
+        // It's already a Date object
+        expiryTimestamp = tokenData.expiresAt.getTime();
+      }
+    }
+
     oauth2Client.setCredentials({
       access_token: tokenData.accessToken,
       refresh_token: tokenData.refreshToken,
-      expiry_date: tokenData.expiresAt?._seconds
-        ? tokenData.expiresAt._seconds * 1000
-        : undefined,
+      expiry_date: expiryTimestamp,
     });
+
+    console.log(
+      `🔑 OAuth credentials set for user ${userId}, expires: ${
+        expiryTimestamp ? new Date(expiryTimestamp).toISOString() : "unknown"
+      }`
+    );
 
     // Check if token is expired and refresh if needed
     const expiryDate = new Date(oauth2Client.credentials.expiry_date || 0);
