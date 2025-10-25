@@ -9,7 +9,9 @@ import {
   Context,
 } from "aws-lambda";
 import { handleChat } from "./handlers/chat";
+import { handleDetectInvitation } from "./handlers/detectInvitation";
 import { handleDetectPriority } from "./handlers/detectPriority";
+import { handleDetectRSVP } from "./handlers/detectRSVP";
 import { handleExtractEvent } from "./handlers/extractEvent";
 import { handleSummarizeDecision } from "./handlers/summarizeDecision";
 import { initializeFirebase } from "./services/firebase";
@@ -105,6 +107,16 @@ export const handler = async (
       return await handleDetectPriority(event);
     }
 
+    // Detect Invitation endpoint
+    if (path === "/ai/detect-invitation" && method === "POST") {
+      return await handleDetectInvitation(event);
+    }
+
+    // Detect RSVP endpoint
+    if (path === "/ai/detect-rsvp" && method === "POST") {
+      return await handleDetectRSVP(event);
+    }
+
     // Detect Conflicts endpoint (placeholder)
     if (path === "/ai/detect-conflicts" && method === "POST") {
       return {
@@ -123,6 +135,12 @@ export const handler = async (
     }
 
     // Unknown endpoint
+    console.log("⚠️ Endpoint not found:", {
+      path,
+      method,
+      rawPath: event.path,
+      resource: event.resource,
+    });
     return {
       statusCode: 404,
       headers: {
@@ -133,6 +151,8 @@ export const handler = async (
         error: "Endpoint not found",
         path,
         method,
+        rawPath: event.path,
+        resource: event.resource,
       }),
     };
   } catch (error: any) {

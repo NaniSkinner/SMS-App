@@ -1,0 +1,221 @@
+═══════════════════════════════════════════════════════════════
+  OAUTH ERROR 400 FIX - READY TO TEST
+═══════════════════════════════════════════════════════════════
+
+✅ CRITICAL FIX APPLIED
+Status: Code changes complete, ready for rebuild and testing
+
+═══════════════════════════════════════════════════════════════
+
+🔍 WHAT WAS THE PROBLEM?
+
+Error: "Error 400: invalid_request" when connecting Google Calendar
+
+Root Cause: expo-auth-session library has a bug in bare workflow
+apps where it doesn't construct the OAuth request correctly.
+
+Specifically:
+- redirectUri was not being set explicitly
+- PKCE was not being explicitly enabled
+- Result: Google rejected the OAuth request as malformed
+
+═══════════════════════════════════════════════════════════════
+
+✅ WHAT WAS FIXED?
+
+File: services/googleAuth.ts
+
+Changes:
+1. Added explicit GOOGLE_REDIRECT_URI constant
+2. Added redirectUri parameter to useAuthRequest
+3. Added usePKCE: true to explicitly enable PKCE
+4. Added detailed debug logging
+5. Added improved error messages
+
+═══════════════════════════════════════════════════════════════
+
+🚀 HOW TO TEST THE FIX
+
+OPTION 1: Use the automated script
+─────────────────────────────────────────────────────────────
+bash scripts/rebuild-and-test-oauth.sh
+
+This will:
+- Kill simulators
+- Clean build
+- Reinstall pods
+- Rebuild app
+- Launch on simulator
+
+
+OPTION 2: Manual rebuild
+─────────────────────────────────────────────────────────────
+cd /Users/nanis/dev/Gauntlet/messageapp
+
+# Clean
+killall Simulator
+cd ios
+rm -rf build
+pod deintegrate
+pod install
+cd ..
+
+# Rebuild
+npx expo run:ios --no-build-cache
+
+═══════════════════════════════════════════════════════════════
+
+📋 TESTING CHECKLIST
+
+Once app launches:
+
+[ ] 1. Check console for debug output:
+       🔍 OAuth Request Configuration:
+          - Client ID: [should be present]
+          - Redirect URI: [should be explicit, not auto-generated]
+          - PKCE codeVerifier: Present [CRITICAL]
+
+[ ] 2. Open AI Chat or Profile screen
+
+[ ] 3. Tap "Connect Calendar" button
+
+[ ] 4. Should see Google sign-in page (NO ERROR 400) ✅
+
+[ ] 5. Sign in with test user email
+
+[ ] 6. Grant calendar permissions
+
+[ ] 7. Should redirect back to app automatically ✅
+
+[ ] 8. Should see "Calendar Connected" message ✅
+
+[ ] 9. Test AI: Ask "What's on my schedule today?"
+
+[ ] 10. AI should respond with calendar data ✅
+
+═══════════════════════════════════════════════════════════════
+
+🎯 WHAT SUCCESS LOOKS LIKE
+
+Console Output:
+───────────────────────────────────────────────────────────────
+🔍 OAuth Request Configuration:
+  - Client ID: 703601462595-qm6fnoqu40dqiqleejiiaean8v703639.apps.googleusercontent.com
+  - Redirect URI: com.googleusercontent.apps.703601462595-qm6fnoqu40dqiqleejiiaean8v703639:/oauth2redirect/google
+  - Scopes: https://www.googleapis.com/auth/calendar.readonly, ...
+  - PKCE Enabled: true
+  - Full OAuth URL: https://accounts.google.com/o/oauth2/v2/auth?...
+  - Request codeVerifier: Present ✅
+
+✅ OAuth success! Processing authentication...
+✅ Access token received, expires in: 3599
+💾 Storing tokens in Firestore...
+✅ Tokens stored successfully
+✅ Google Calendar connected successfully!
+
+
+User Experience:
+───────────────────────────────────────────────────────────────
+- Tap "Connect Calendar"
+- See Google sign-in (no error page)
+- Sign in smoothly
+- Redirect back to app
+- See success message
+- AI can access calendar
+
+═══════════════════════════════════════════════════════════════
+
+❌ IF ERROR 400 STILL APPEARS
+
+Check these in order:
+
+1. Google Cloud Console Configuration:
+   ──────────────────────────────────────────────────────────
+   Go to: https://console.cloud.google.com/apis/credentials
+   
+   Find iOS OAuth client:
+   - Client ID: 703601462595-qm6fnoqu40dqiqleejiiaean8v703639
+   - Type: iOS (NOT Web, NOT Android)
+   - Bundle ID: com.messageapp.messaging (EXACT match)
+   
+   If wrong: Edit and save, wait 10 minutes, rebuild app
+
+2. OAuth Consent Screen:
+   ──────────────────────────────────────────────────────────
+   Go to: https://console.cloud.google.com/apis/credentials/consent
+   
+   If status is "Testing":
+   - Click "ADD USERS"
+   - Add both test user emails
+   - Save
+
+3. Google Calendar API:
+   ──────────────────────────────────────────────────────────
+   Go to: https://console.cloud.google.com/apis/library
+   
+   Search "Google Calendar API"
+   - Status should be "ENABLED"
+   - If not: Click it → Click ENABLE
+
+4. Verify Fix Is Still Present:
+   ──────────────────────────────────────────────────────────
+   grep "redirectUri: GOOGLE_REDIRECT_URI" services/googleAuth.ts
+   grep "usePKCE: true" services/googleAuth.ts
+   
+   Both should return results
+   If not: The fix was removed (contact support)
+
+═══════════════════════════════════════════════════════════════
+
+📚 DOCUMENTATION CREATED
+
+1. OAuth/CRITICAL_FIX_APPLIED.md
+   - Full technical explanation
+   - Detailed fix documentation
+   - Troubleshooting guide
+
+2. OAuth/GOOGLE_CLOUD_CONSOLE_FIX.md
+   - Step-by-step Google Cloud Console setup
+   - Common configuration issues
+
+3. OAuth/OAUTH_FIX_CHECKLIST.md
+   - Previous troubleshooting checklist
+
+4. IMPORTANT.md (updated)
+   - Main OAuth configuration document
+   - Now includes fix documentation
+
+5. scripts/rebuild-and-test-oauth.sh
+   - Automated rebuild script
+   - Includes verification steps
+
+═══════════════════════════════════════════════════════════════
+
+💡 KEY TAKEAWAY
+
+The fix is applied to your code. You just need to:
+1. Rebuild the app completely
+2. Test calendar connection
+3. It should work now!
+
+If Error 400 persists after rebuild, the issue is in Google
+Cloud Console configuration (Bundle ID mismatch or wrong client type).
+
+═══════════════════════════════════════════════════════════════
+
+🚀 READY TO TEST!
+
+Run this command to rebuild and test:
+
+bash scripts/rebuild-and-test-oauth.sh
+
+Or manually rebuild:
+
+cd ios && rm -rf build && pod deintegrate && pod install && cd ..
+npx expo run:ios --no-build-cache
+
+═══════════════════════════════════════════════════════════════
+
+Last Updated: October 25, 2025
+Fix Status: ✅ APPLIED - READY FOR TESTING
+

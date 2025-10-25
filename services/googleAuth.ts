@@ -21,9 +21,11 @@ WebBrowser.maybeCompleteAuthSession();
 const GOOGLE_IOS_CLIENT_ID =
   "703601462595-qm6fnoqu40dqiqleejiiaean8v703639.apps.googleusercontent.com";
 
-// iOS OAuth clients don't need an explicit redirect URI in the code
-// The redirect happens via the URL scheme registered in Info.plist
-// URL scheme: com.googleusercontent.apps.703601462595-qm6fnoqu40dqiqleejiiaean8v703639
+// ⚠️ CRITICAL: iOS OAuth redirect URI
+// Even though iOS uses URL schemes, we MUST explicitly specify the redirectUri
+// for expo-auth-session to construct the OAuth request correctly in bare workflow
+const GOOGLE_REDIRECT_URI =
+  "com.googleusercontent.apps.703601462595-qm6fnoqu40dqiqleejiiaean8v703639:/oauth2redirect/google";
 
 // Scopes needed for Google Calendar
 const CALENDAR_SCOPES = [
@@ -75,13 +77,32 @@ const CALENDAR_SCOPES = [
 export function useGoogleCalendarAuth() {
   const [request, response, promptAsync] = Google.useAuthRequest({
     iosClientId: GOOGLE_IOS_CLIENT_ID, // ⚠️ Native iOS OAuth for bare workflow
+    redirectUri: GOOGLE_REDIRECT_URI, // ⚠️ CRITICAL: Must explicitly set for bare workflow
     scopes: CALENDAR_SCOPES,
-    // No redirectUri needed - iOS handles via URL scheme in Info.plist automatically
+    usePKCE: true, // ⚠️ Enable PKCE for security (required for mobile apps)
     extraParams: {
       access_type: "offline", // Get refresh token
       prompt: "consent", // Always get refresh token
     },
   });
+
+  // Debug: Log the OAuth request configuration
+  React.useEffect(() => {
+    if (request) {
+      console.log("🔍 OAuth Request Configuration:");
+      console.log("  - Client ID:", GOOGLE_IOS_CLIENT_ID);
+      console.log("  - Redirect URI:", GOOGLE_REDIRECT_URI);
+      console.log("  - Scopes:", CALENDAR_SCOPES.join(", "));
+      console.log("  - PKCE Enabled:", true);
+      if (request.url) {
+        console.log("  - Full OAuth URL:", request.url);
+      }
+      console.log(
+        "  - Request codeVerifier:",
+        request.codeVerifier ? "Present" : "Missing"
+      );
+    }
+  }, [request]);
 
   // Handle OAuth response
   React.useEffect(() => {
@@ -91,8 +112,18 @@ export function useGoogleCalendarAuth() {
       handleAuthSuccess(authentication);
     } else if (response?.type === "error") {
       console.error("❌ OAuth error:", response.error);
+      console.error("Error params:", response.params);
       console.error("Full response:", JSON.stringify(response, null, 2));
-      // Handle error in UI
+
+      // Provide user-friendly error message
+      if (response.error?.toString().includes("invalid_request")) {
+        console.error("💡 Error 400: Invalid Request - This usually means:");
+        console.error("   1. Bundle ID mismatch in Google Cloud Console");
+        console.error("   2. OAuth client type is wrong (should be iOS)");
+        console.error("   3. Redirect URI doesn't match");
+        console.error("   Expected Bundle ID: com.messageapp.messaging");
+        console.error("   Expected Redirect URI:", GOOGLE_REDIRECT_URI);
+      }
     } else if (response) {
       console.log("OAuth response type:", response.type);
       console.log("Full response:", JSON.stringify(response, null, 2));
@@ -213,27 +244,65 @@ export async function isCalendarConnected(): Promise<boolean> {
 }
 
 /**
- * Disconnect Google Calendar (revoke access)
+ * Disconnect Google Calendar (revoke access and clear all tokens)
+ *
+ * ⚠️ CRITICAL: This function clears stale/corrupted tokens
+ * Use this when users experience connection issues or Error 400
+ *
+ * What it does:
+ * 1. Deletes all Google OAuth tokens from Firestore
+ * 2. Clears calendar connection status
+ * 3. Allows fresh OAuth connection
+ *
+ * This is equivalent to "deleting user from Firebase" but only for calendar tokens
  */
 export async function disconnectCalendar(): Promise<void> {
   try {
     const currentUser = auth.currentUser;
-    if (!currentUser) return;
+    if (!currentUser) {
+      console.log("⚠️ No user authenticated, cannot disconnect calendar");
+      return;
+    }
 
-    // Delete tokens from Firestore
+    console.log("🔄 Disconnecting Google Calendar...");
+    console.log("  - User ID:", currentUser.uid);
+
+    // Delete tokens from Firestore (this clears stale/corrupted tokens)
     const tokenRef = doc(db, "users", currentUser.uid, "tokens", "google");
-    await deleteDoc(tokenRef);
 
-    // Update user preferences
+    try {
+      await deleteDoc(tokenRef);
+      console.log("✅ Tokens deleted from Firestore");
+    } catch (deleteError) {
+      // Token might not exist, that's okay
+      console.log("⚠️ No tokens found to delete (already clean)");
+    }
+
+    // Update user preferences to indicate calendar is disconnected
     const userRef = doc(db, "users", currentUser.uid);
-    await updateDoc(userRef, {
-      calendarConnected: false,
-      calendarProvider: null,
-    });
+    try {
+      await updateDoc(userRef, {
+        calendarConnected: false,
+        calendarProvider: null,
+      });
+      console.log("✅ User preferences updated");
+    } catch (updateError) {
+      // User doc might not exist, create it
+      await setDoc(
+        userRef,
+        {
+          calendarConnected: false,
+          calendarProvider: null,
+        },
+        { merge: true }
+      );
+      console.log("✅ User preferences created/updated");
+    }
 
-    console.log("✅ Google Calendar disconnected");
+    console.log("✅ Google Calendar disconnected successfully");
+    console.log("💡 User can now reconnect with fresh credentials");
   } catch (error) {
-    console.error("Error disconnecting calendar:", error);
+    console.error("❌ Error disconnecting calendar:", error);
     throw error;
   }
 }

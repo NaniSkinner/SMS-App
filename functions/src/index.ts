@@ -163,6 +163,189 @@ export const onMessageCreated = functions.firestore
         }
       }
 
+      // === RSVP TRACKING (Group Chats Only) ===
+      let isInvitation = false;
+      let invitationData: any = null;
+
+      if (conversationType === "group") {
+        // Pre-filter: Check for invitation keywords
+        const invitationKeywords = [
+          "party",
+          "invite",
+          "invited",
+          "join us",
+          "come to",
+          "playdate",
+          "meeting",
+          "event",
+          "gathering",
+          "get together",
+          "potluck",
+          "birthday",
+          "celebration",
+          "anyone want",
+          "who wants",
+          "rsvp",
+        ];
+
+        const messageTextLower = messageText.toLowerCase();
+        const hasInvitationKeyword = invitationKeywords.some((keyword) =>
+          messageTextLower.includes(keyword)
+        );
+
+        // Check if this looks like an invitation
+        if (hasInvitationKeyword) {
+          console.log("🎉 Invitation keyword detected, analyzing...");
+
+          try {
+            const lambdaUrl =
+              functions.config().lambda?.api_url ||
+              process.env.LAMBDA_API_URL ||
+              "";
+            const response = await fetch(`${lambdaUrl}/ai/detect-invitation`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                messageText,
+                conversationId,
+                senderId,
+                timezone: "America/Chicago",
+              }),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+
+              if (data.isInvitation && data.requiresRSVP) {
+                isInvitation = true;
+                invitationData = {
+                  messageId,
+                  conversationId,
+                  senderId,
+                  senderName,
+                  invitationType: data.invitationType,
+                  eventTitle: data.eventTitle,
+                  eventDate: data.eventDate,
+                  eventTime: data.eventTime,
+                  eventLocation: data.eventLocation,
+                  invitationText: data.invitationText || messageText,
+                  requiresRSVP: data.requiresRSVP,
+                  rsvpDeadline: data.rsvpDeadline,
+                  detectedAt: admin.firestore.FieldValue.serverTimestamp(),
+                  confidence: data.confidence,
+                };
+
+                // Store invitation data on message
+                await snapshot.ref.update({
+                  isInvitation: true,
+                  invitationData,
+                  rsvpResponses: [],
+                });
+
+                console.log(`✅ Invitation detected: ${data.eventTitle}`);
+              }
+            } else {
+              console.warn(
+                "⚠️ Invitation detection failed:",
+                response.statusText
+              );
+            }
+          } catch (error) {
+            console.error("❌ Error calling invitation detection:", error);
+            // Non-blocking: Continue with normal flow
+          }
+        }
+
+        // Check if this message is an RSVP response to an existing invitation
+        if (!isInvitation) {
+          try {
+            // Get recent messages to find invitations
+            const recentMessagesSnapshot = await admin
+              .firestore()
+              .collection("conversations")
+              .doc(conversationId)
+              .collection("messages")
+              .orderBy("timestamp", "desc")
+              .limit(20)
+              .get();
+
+            // Find invitation messages
+            for (const doc of recentMessagesSnapshot.docs) {
+              const msgData = doc.data();
+              if (msgData.isInvitation && msgData.invitationData) {
+                // Check if current message is RSVP to this invitation
+                console.log("✅ Checking RSVP response...");
+
+                const lambdaUrl =
+                  functions.config().lambda?.api_url ||
+                  process.env.LAMBDA_API_URL ||
+                  "";
+                const response = await fetch(`${lambdaUrl}/ai/detect-rsvp`, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    messageText,
+                    invitationText: msgData.invitationData.invitationText,
+                    senderId,
+                    senderName,
+                    conversationId,
+                  }),
+                });
+
+                if (response.ok) {
+                  const rsvpData = await response.json();
+
+                  if (rsvpData.isRSVP && rsvpData.rsvpStatus) {
+                    // Add/update RSVP response on the invitation message
+                    const existingResponses = msgData.rsvpResponses || [];
+                    const responseIndex = existingResponses.findIndex(
+                      (r: any) => r.userId === senderId
+                    );
+
+                    const newResponse = {
+                      userId: senderId,
+                      userName: senderName,
+                      status: rsvpData.rsvpStatus,
+                      messageId,
+                      responseText: messageText,
+                      respondedAt: admin.firestore.FieldValue.serverTimestamp(),
+                      numberOfPeople: rsvpData.numberOfPeople,
+                      conditions: rsvpData.conditions,
+                      confidence: rsvpData.confidence,
+                    };
+
+                    if (responseIndex >= 0) {
+                      // Update existing response
+                      existingResponses[responseIndex] = newResponse;
+                    } else {
+                      // Add new response
+                      existingResponses.push(newResponse);
+                    }
+
+                    // Update invitation message
+                    await doc.ref.update({
+                      rsvpResponses: existingResponses,
+                    });
+
+                    console.log(
+                      `✅ RSVP tracked: ${senderName} → ${rsvpData.rsvpStatus}`
+                    );
+                    break; // Found the invitation, stop checking
+                  }
+                }
+              }
+            }
+          } catch (error) {
+            console.error("❌ Error checking RSVP responses:", error);
+            // Non-blocking: Continue with normal flow
+          }
+        }
+      }
+
       // Get recipients (exclude sender)
       const recipientIds = participants.filter((id) => id !== senderId);
 

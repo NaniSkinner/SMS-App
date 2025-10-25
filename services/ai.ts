@@ -544,3 +544,139 @@ export const checkAIServiceHealth = async (): Promise<boolean> => {
     return false;
   }
 };
+
+/**
+ * Detect if a message is an event invitation
+ */
+export const detectInvitation = async (
+  messageText: string,
+  conversationId: string,
+  senderId: string,
+  timezone?: string
+): Promise<
+  ApiResponse<{
+    isInvitation: boolean;
+    invitationType?:
+      | "party"
+      | "meeting"
+      | "playdate"
+      | "event"
+      | "activity"
+      | "other";
+    eventTitle?: string;
+    eventDate?: string;
+    eventTime?: string;
+    eventLocation?: string;
+    invitationText?: string;
+    requiresRSVP: boolean;
+    rsvpDeadline?: string;
+    confidence: number;
+  }>
+> => {
+  console.log("🎉 Detecting invitation in message");
+
+  try {
+    const response = await fetch(`${AI_API_BASE_URL}/detect-invitation`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messageText,
+        conversationId,
+        senderId,
+        timezone: timezone || "America/Chicago",
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ Invitation detection failed:", errorText);
+      return {
+        success: false,
+        error: `Failed to detect invitation: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log(
+      `✅ Invitation detection complete: ${data.isInvitation ? "YES" : "NO"}`
+    );
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error: any) {
+    console.error("❌ Error detecting invitation:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to detect invitation",
+    };
+  }
+};
+
+/**
+ * Detect if a message is an RSVP response to an invitation
+ */
+export const detectRSVP = async (
+  messageText: string,
+  invitationText: string,
+  senderId: string,
+  senderName: string,
+  conversationId: string
+): Promise<
+  ApiResponse<{
+    isRSVP: boolean;
+    rsvpStatus?: "yes" | "no" | "maybe";
+    confidence: number;
+    reason?: string;
+    numberOfPeople?: number;
+    conditions?: string;
+  }>
+> => {
+  console.log(`✅ Detecting RSVP response from ${senderName}`);
+
+  try {
+    const response = await fetch(`${AI_API_BASE_URL}/detect-rsvp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messageText,
+        invitationText,
+        senderId,
+        senderName,
+        conversationId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("❌ RSVP detection failed:", errorText);
+      return {
+        success: false,
+        error: `Failed to detect RSVP: ${response.status}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log(
+      `✅ RSVP detection complete: ${
+        data.isRSVP ? data.rsvpStatus : "NOT AN RSVP"
+      }`
+    );
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error: any) {
+    console.error("❌ Error detecting RSVP:", error);
+    return {
+      success: false,
+      error: error.message || "Failed to detect RSVP",
+    };
+  }
+};

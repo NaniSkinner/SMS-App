@@ -6,6 +6,7 @@
 
 import { AIMessageBubble } from "@/components/chat/AIMessageBubble";
 import {
+  disconnectCalendar,
   isCalendarConnected,
   useGoogleCalendarAuth,
 } from "@/services/googleAuth";
@@ -198,6 +199,85 @@ export default function AIChatScreen() {
     }
   };
 
+  const handleDisconnectCalendar = async () => {
+    Alert.alert(
+      "Disconnect Calendar",
+      "Are you sure you want to disconnect your Google Calendar?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Disconnect",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await disconnectCalendar();
+              setCalendarConnected(false);
+              Alert.alert(
+                "✅ Disconnected",
+                "Your Google Calendar has been disconnected. You can reconnect anytime.",
+                [{ text: "OK" }]
+              );
+            } catch (error) {
+              console.error("Error disconnecting calendar:", error);
+              Alert.alert(
+                "❌ Error",
+                "Failed to disconnect calendar. Please try again.",
+                [{ text: "OK" }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleResetConnection = async () => {
+    Alert.alert(
+      "🔄 Reset Calendar Connection",
+      "This will clear your calendar connection and let you reconnect with fresh credentials. Use this if you're having connection issues.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset & Reconnect",
+          onPress: async () => {
+            try {
+              // First disconnect to clear stale tokens
+              await disconnectCalendar();
+              setCalendarConnected(false);
+
+              // Wait a moment for cleanup
+              await new Promise((resolve) => setTimeout(resolve, 500));
+
+              // Then immediately reconnect
+              const result = await promptAsync();
+
+              if (result?.type === "success") {
+                Alert.alert(
+                  "✅ Connection Reset!",
+                  "Your Google Calendar has been reconnected successfully!",
+                  [{ text: "OK", onPress: () => checkCalendarConnection() }]
+                );
+              } else if (result?.type === "error") {
+                Alert.alert(
+                  "❌ Connection Failed",
+                  "Failed to reconnect. Please try connecting again from the button.",
+                  [{ text: "OK" }]
+                );
+              }
+            } catch (error) {
+              console.error("Error resetting connection:", error);
+              Alert.alert(
+                "❌ Error",
+                "Failed to reset connection. Please try again.",
+                [{ text: "OK" }]
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleSendMessage = async () => {
     if (!inputText.trim() || isLoading || !user) {
       return;
@@ -331,10 +411,32 @@ export default function AIChatScreen() {
       )}
 
       {calendarConnected && (
-        <Text style={styles.calendarHint}>
-          💡 Now you can ask me about your schedule, create events, and check
-          for conflicts!
-        </Text>
+        <>
+          <Text style={styles.calendarHint}>
+            💡 Now you can ask me about your schedule, create events, and check
+            for conflicts!
+          </Text>
+          <View style={styles.calendarActions}>
+            <TouchableOpacity
+              style={styles.resetButton}
+              onPress={handleResetConnection}
+            >
+              <Ionicons name="refresh" size={16} color={colors.primary} />
+              <Text style={styles.resetButtonText}>Reset Connection</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.disconnectButton}
+              onPress={handleDisconnectCalendar}
+            >
+              <Ionicons
+                name="close-circle"
+                size={16}
+                color={colors.light.error}
+              />
+              <Text style={styles.disconnectButtonText}>Disconnect</Text>
+            </TouchableOpacity>
+          </View>
+        </>
       )}
     </View>
   );
@@ -549,6 +651,44 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontStyle: "italic",
     paddingHorizontal: 32,
+  },
+  calendarActions: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 12,
+    justifyContent: "center",
+  },
+  resetButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.light.background,
+  },
+  resetButtonText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  disconnectButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.light.error,
+    backgroundColor: colors.light.background,
+  },
+  disconnectButtonText: {
+    fontSize: 13,
+    color: colors.light.error,
+    fontWeight: "600",
   },
   calendarBanner: {
     flexDirection: "row",

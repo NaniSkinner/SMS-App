@@ -87,6 +87,21 @@ export const getMessages = async (
         urgencyFactors: data.urgencyFactors,
         actionRequired: data.actionRequired,
         priorityConfidence: data.priorityConfidence,
+        // RSVP fields
+        isInvitation: data.isInvitation,
+        invitationData: data.invitationData
+          ? {
+              ...data.invitationData,
+              detectedAt:
+                convertToDate(data.invitationData.detectedAt) || new Date(),
+            }
+          : undefined,
+        rsvpResponses: data.rsvpResponses
+          ? data.rsvpResponses.map((r: any) => ({
+              ...r,
+              respondedAt: convertToDate(r.respondedAt) || new Date(),
+            }))
+          : undefined,
       };
     });
 
@@ -238,6 +253,21 @@ export const subscribeToMessages = (
           urgencyFactors: data.urgencyFactors,
           actionRequired: data.actionRequired,
           priorityConfidence: data.priorityConfidence,
+          // RSVP fields
+          isInvitation: data.isInvitation,
+          invitationData: data.invitationData
+            ? {
+                ...data.invitationData,
+                detectedAt:
+                  convertToDate(data.invitationData.detectedAt) || new Date(),
+              }
+            : undefined,
+          rsvpResponses: data.rsvpResponses
+            ? data.rsvpResponses.map((r: any) => ({
+                ...r,
+                respondedAt: convertToDate(r.respondedAt) || new Date(),
+              }))
+            : undefined,
         };
       });
 

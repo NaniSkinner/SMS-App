@@ -556,3 +556,182 @@ Be conservative: only flag as "high" if truly urgent, most messages should be "n
     );
   }
 }
+
+/**
+ * Detect if a message is an event invitation
+ * Uses GPT-4o to analyze if message contains an invitation to an event
+ */
+export async function detectInvitation(
+  messageText: string,
+  timezone: string = "America/Chicago"
+): Promise<any> {
+  try {
+    const client = await getClient();
+
+    // Get current date/time in user's timezone
+    const now = new Date();
+    const currentDate = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: timezone,
+    });
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timezone,
+    });
+
+    const prompt = `Analyze this message to determine if it's an invitation to an event or activity.
+
+CURRENT DATE: ${currentDate}
+CURRENT TIME: ${currentTime}
+
+Message: "${messageText}"
+
+Output JSON format:
+{
+  "isInvitation": boolean,
+  "invitationType": "party" | "meeting" | "playdate" | "event" | "activity" | "other" | null,
+  "eventTitle": string | null (brief title),
+  "eventDate": string | null (extracted date),
+  "eventTime": string | null (extracted time),
+  "eventLocation": string | null (where),
+  "invitationText": string | null (the key invitation phrase),
+  "requiresRSVP": boolean (does it ask for confirmation?),
+  "rsvpDeadline": string | null (when to respond by),
+  "confidence": number (0-1)
+}
+
+WHAT COUNTS AS AN INVITATION:
+✅ Direct invites: "Want to come to...", "You're invited to...", "Join us for..."
+✅ Event announcements: "We're having a party...", "Birthday party at..."
+✅ Activity proposals: "Let's meet for...", "How about we..."
+✅ Playdates: "Kids playdate on Saturday", "Want to bring kids to the park?"
+✅ Meetings: "Can we meet to discuss...", "Parent-teacher conference..."
+✅ Group activities: "Anyone free for soccer practice?", "Team potluck next week"
+
+❌ NOT invitations:
+- Questions about availability ("Are you free Friday?")
+- Tentative suggestions ("We should hang out sometime")
+- General planning ("We need to schedule...")
+- Past event mentions ("Thanks for coming yesterday")
+- Event info without invite ("School event is next week")
+
+CONTEXT:
+- This is for busy parents coordinating family activities
+- Invitations often involve children's activities, school events, social gatherings
+- May be casual/informal language
+- Often includes date, time, or location details
+- Usually implies action: come, attend, join, participate
+
+Be strict: Only mark as invitation if there's a clear invite to a specific event/activity.`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new AppError("No response from OpenAI", 500, "NO_RESPONSE");
+    }
+
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("❌ Invitation detection error:", error);
+    throw new AppError(
+      `Invitation detection failed: ${error.message}`,
+      500,
+      "INVITATION_DETECTION_ERROR"
+    );
+  }
+}
+
+/**
+ * Detect if a message is an RSVP response to an invitation
+ * Uses GPT-4o to analyze responses like "yes", "can't make it", "maybe"
+ */
+export async function detectRSVPResponse(
+  messageText: string,
+  invitationText: string
+): Promise<any> {
+  try {
+    const client = await getClient();
+
+    const prompt = `Analyze if this message is an RSVP response to the given invitation.
+
+INVITATION:
+"${invitationText}"
+
+RESPONSE MESSAGE:
+"${messageText}"
+
+Output JSON format:
+{
+  "isRSVP": boolean,
+  "rsvpStatus": "yes" | "no" | "maybe" | null,
+  "confidence": number (0-1),
+  "reason": string | null (why you classified it this way),
+  "numberOfPeople": number | null (how many people, if mentioned),
+  "conditions": string | null (any conditions like "only if it's after 3pm")
+}
+
+YES responses (affirmative):
+- "Yes", "Sure", "Sounds good", "Count me in", "We're in", "I'll be there"
+- "We can make it", "I'm coming", "See you there", "Looking forward to it"
+- "We'll come", "I'll bring the kids", "We'd love to"
+- "+1", "✓", "👍"
+
+NO responses (declining):
+- "No", "Sorry", "Can't make it", "Won't be able to", "Have to pass"
+- "Not available", "We're busy", "Prior commitment", "Can't attend"
+- "Count us out", "We'll skip", "Not this time"
+- "❌", "👎"
+
+MAYBE responses (tentative):
+- "Maybe", "Not sure", "Tentative", "Possibly", "I'll try"
+- "Let me check", "Need to confirm", "Depends", "Might be able to"
+- "I'll let you know", "Check calendar", "We'll see"
+- "🤔", "❓"
+
+NOT RSVP responses:
+- Questions about the event ("What time is it?", "Where is it?")
+- Unrelated messages
+- General acknowledgments without commitment ("Thanks for inviting us")
+- Messages from the event organizer themselves
+
+CONTEXT:
+- Responses can be casual/informal
+- May include reasons or explanations
+- May mention bringing others ("We'll bring the kids", "Family of 4")
+- May have conditions ("Only if weather is good")
+
+Be accurate: Match the tone and intent of the response.`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new AppError("No response from OpenAI", 500, "NO_RESPONSE");
+    }
+
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("❌ RSVP detection error:", error);
+    throw new AppError(
+      `RSVP detection failed: ${error.message}`,
+      500,
+      "RSVP_DETECTION_ERROR"
+    );
+  }
+}

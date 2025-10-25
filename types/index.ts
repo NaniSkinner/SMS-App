@@ -53,6 +53,10 @@ export interface Message {
   urgencyFactors?: string[];
   actionRequired?: boolean;
   priorityConfidence?: number;
+  // RSVP tracking fields
+  isInvitation?: boolean;
+  invitationData?: Invitation;
+  rsvpResponses?: RSVPResponse[];
 }
 
 export interface OptimisticMessage extends Message {
@@ -411,4 +415,88 @@ export interface AISummarizeDecisionResponse {
   keyMessages?: string[];
   consensusLevel?: ConsensusLevel;
   message?: string; // For when no decision is found
+}
+
+// RSVP Tracking Types
+export type InvitationType =
+  | "party"
+  | "meeting"
+  | "playdate"
+  | "event"
+  | "activity"
+  | "other";
+
+export type RSVPStatus = "yes" | "no" | "maybe" | "pending";
+
+export interface Invitation {
+  messageId: string; // The message containing the invitation
+  conversationId: string;
+  senderId: string;
+  senderName: string;
+  invitationType: InvitationType;
+  eventTitle: string;
+  eventDate?: string;
+  eventTime?: string;
+  eventLocation?: string;
+  invitationText: string;
+  requiresRSVP: boolean;
+  rsvpDeadline?: string;
+  detectedAt: Date;
+  confidence: number; // 0-1
+}
+
+export interface RSVPResponse {
+  userId: string;
+  userName: string;
+  status: RSVPStatus;
+  messageId: string; // The message containing the RSVP
+  responseText: string;
+  respondedAt: Date;
+  numberOfPeople?: number;
+  conditions?: string;
+  confidence: number; // 0-1
+}
+
+export interface RSVPTracker {
+  invitationMessageId: string;
+  invitation: Invitation;
+  responses: RSVPResponse[];
+  participantIds: string[]; // All people in the conversation (for "pending" tracking)
+}
+
+export interface AIDetectInvitationRequest {
+  messageText: string;
+  conversationId: string;
+  senderId: string;
+  timezone?: string;
+}
+
+export interface AIDetectInvitationResponse {
+  isInvitation: boolean;
+  invitationType?: InvitationType;
+  eventTitle?: string;
+  eventDate?: string;
+  eventTime?: string;
+  eventLocation?: string;
+  invitationText?: string;
+  requiresRSVP: boolean;
+  rsvpDeadline?: string;
+  confidence: number;
+}
+
+export interface AIDetectRSVPRequest {
+  messageText: string;
+  invitationText: string;
+  senderId: string;
+  senderName?: string;
+  conversationId: string;
+}
+
+export interface AIDetectRSVPResponse {
+  isRSVP: boolean;
+  rsvpStatus?: "yes" | "no" | "maybe";
+  confidence: number;
+  reason?: string;
+  numberOfPeople?: number;
+  conditions?: string;
 }

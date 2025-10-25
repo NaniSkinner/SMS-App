@@ -5,9 +5,10 @@
 
 import { PriorityBadge } from "@/components/chat/PriorityBadge";
 import { PriorityDetailsModal } from "@/components/chat/PriorityDetailsModal";
+import { RSVPTrackerCard } from "@/components/chat/RSVPTrackerCard";
 import { Avatar } from "@/components/common/Avatar";
 import { colors } from "@/theme/colors";
-import { Message } from "@/types";
+import { Message, RSVPTracker } from "@/types";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActionSheetIOS,
@@ -155,156 +156,176 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     );
   }
 
+  // Build RSVP tracker if this is an invitation
+  const rsvpTracker: RSVPTracker | null =
+    message.isInvitation && message.invitationData
+      ? {
+          invitationMessageId: message.id,
+          invitation: message.invitationData,
+          responses: message.rsvpResponses || [],
+          participantIds: [], // Will be populated by parent component
+        }
+      : null;
+
   return (
-    <Animated.View
-      style={[
-        styles.container,
-        isOwnMessage ? styles.containerOwn : styles.containerOther,
-        {
-          opacity: fadeAnim,
-          transform: [
-            {
-              translateX: isOwnMessage
-                ? slideAnim
-                : Animated.multiply(slideAnim, -1),
-            },
-          ],
-        },
-      ]}
-    >
-      {/* Avatar for received group messages */}
-      {!isOwnMessage && showAvatar && (
-        <View style={styles.avatarContainer}>
-          <Avatar
-            displayName={senderName || "User"}
-            photoURL={senderPhotoURL}
-            size={32}
-          />
-        </View>
-      )}
-
-      {/* Spacer when no avatar needed in groups (left side) */}
-      {!isOwnMessage && isGroupChat && !showAvatar && (
-        <View style={styles.avatarSpacer} />
-      )}
-
-      <View
+    <View>
+      <Animated.View
         style={[
-          styles.bubbleContainer,
-          isOwnMessage && styles.bubbleContainerOwn,
+          styles.container,
+          isOwnMessage ? styles.containerOwn : styles.containerOther,
+          {
+            opacity: fadeAnim,
+            transform: [
+              {
+                translateX: isOwnMessage
+                  ? slideAnim
+                  : Animated.multiply(slideAnim, -1),
+              },
+            ],
+          },
         ]}
       >
-        {/* Priority Badge */}
-        {message.priority && message.priority !== "none" && (
-          <View style={styles.priorityContainer}>
-            <PriorityBadge
-              priority={message.priority}
-              size="small"
-              onPress={() => setShowPriorityModal(true)}
+        {/* Avatar for received group messages */}
+        {!isOwnMessage && showAvatar && (
+          <View style={styles.avatarContainer}>
+            <Avatar
+              displayName={senderName || "User"}
+              photoURL={senderPhotoURL}
+              size={32}
             />
           </View>
         )}
 
-        {/* Sender name for group messages (all messages) */}
-        {isGroupChat && senderName && (
-          <Text
-            style={[styles.senderName, isOwnMessage && styles.senderNameOwn]}
-          >
-            {senderName}
-          </Text>
+        {/* Spacer when no avatar needed in groups (left side) */}
+        {!isOwnMessage && isGroupChat && !showAvatar && (
+          <View style={styles.avatarSpacer} />
         )}
 
-        {/* Message bubble - with long press for AI analysis */}
-        <Pressable
-          onLongPress={onAnalyzeWithAI ? handleLongPress : undefined}
-          delayLongPress={500}
-          style={({ pressed }) => [
-            styles.bubble,
-            isOwnMessage ? styles.bubbleOwn : styles.bubbleOther,
-            message.status === "failed" && styles.bubbleFailed,
-            pressed && styles.bubblePressed,
+        <View
+          style={[
+            styles.bubbleContainer,
+            isOwnMessage && styles.bubbleContainerOwn,
           ]}
         >
-          <Text
-            style={[
-              styles.messageText,
-              isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
-            ]}
-          >
-            {message.text}
-          </Text>
+          {/* Priority Badge */}
+          {message.priority && message.priority !== "none" && (
+            <View style={styles.priorityContainer}>
+              <PriorityBadge
+                priority={message.priority}
+                size="small"
+                onPress={() => setShowPriorityModal(true)}
+              />
+            </View>
+          )}
 
-          {/* Timestamp and status */}
+          {/* Sender name for group messages (all messages) */}
+          {isGroupChat && senderName && (
+            <Text
+              style={[styles.senderName, isOwnMessage && styles.senderNameOwn]}
+            >
+              {senderName}
+            </Text>
+          )}
+
+          {/* Message bubble - with long press for AI analysis */}
           <Pressable
-            style={styles.metaContainer}
-            onPress={() => {
-              if (isGroupChat && isOwnMessage && onReadStatusPress) {
-                onReadStatusPress(message);
-              }
-            }}
-            disabled={!isGroupChat || !isOwnMessage || !onReadStatusPress}
+            onLongPress={onAnalyzeWithAI ? handleLongPress : undefined}
+            delayLongPress={500}
+            style={({ pressed }) => [
+              styles.bubble,
+              isOwnMessage ? styles.bubbleOwn : styles.bubbleOther,
+              message.status === "failed" && styles.bubbleFailed,
+              pressed && styles.bubblePressed,
+            ]}
           >
             <Text
               style={[
-                styles.timestamp,
-                isOwnMessage ? styles.timestampOwn : styles.timestampOther,
+                styles.messageText,
+                isOwnMessage ? styles.messageTextOwn : styles.messageTextOther,
               ]}
             >
-              {formatTime(message.timestamp)}
+              {message.text}
             </Text>
 
-            {isOwnMessage && (
+            {/* Timestamp and status */}
+            <Pressable
+              style={styles.metaContainer}
+              onPress={() => {
+                if (isGroupChat && isOwnMessage && onReadStatusPress) {
+                  onReadStatusPress(message);
+                }
+              }}
+              disabled={!isGroupChat || !isOwnMessage || !onReadStatusPress}
+            >
               <Text
                 style={[
-                  styles.statusIcon,
-                  (message.status === "read" || allMembersRead) &&
-                    styles.statusIconRead,
-                  message.status === "failed" && styles.statusIconFailed,
+                  styles.timestamp,
+                  isOwnMessage ? styles.timestampOwn : styles.timestampOther,
                 ]}
               >
-                {getStatusIcon()}
+                {formatTime(message.timestamp)}
               </Text>
-            )}
-          </Pressable>
-        </Pressable>
 
-        {/* Failed message indicator with retry button */}
-        {message.status === "failed" && onRetry && (
-          <Pressable
-            onPress={() => onRetry(message)}
-            style={({ pressed }) => [
-              styles.retryButton,
-              pressed && styles.retryButtonPressed,
-            ]}
-          >
-            <Text style={styles.failedText}>⟲ Tap to retry</Text>
+              {isOwnMessage && (
+                <Text
+                  style={[
+                    styles.statusIcon,
+                    (message.status === "read" || allMembersRead) &&
+                      styles.statusIconRead,
+                    message.status === "failed" && styles.statusIconFailed,
+                  ]}
+                >
+                  {getStatusIcon()}
+                </Text>
+              )}
+            </Pressable>
           </Pressable>
+
+          {/* Failed message indicator with retry button */}
+          {message.status === "failed" && onRetry && (
+            <Pressable
+              onPress={() => onRetry(message)}
+              style={({ pressed }) => [
+                styles.retryButton,
+                pressed && styles.retryButtonPressed,
+              ]}
+            >
+              <Text style={styles.failedText}>⟲ Tap to retry</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Avatar for own group messages (right side) */}
+        {isOwnMessage && showAvatar && (
+          <View style={styles.avatarContainerOwn}>
+            <Avatar
+              displayName={senderName || "User"}
+              photoURL={senderPhotoURL}
+              size={32}
+            />
+          </View>
         )}
-      </View>
 
-      {/* Avatar for own group messages (right side) */}
-      {isOwnMessage && showAvatar && (
-        <View style={styles.avatarContainerOwn}>
-          <Avatar
-            displayName={senderName || "User"}
-            photoURL={senderPhotoURL}
-            size={32}
-          />
+        {/* Spacer when no avatar needed in groups (right side) */}
+        {isOwnMessage && isGroupChat && !showAvatar && (
+          <View style={styles.avatarSpacer} />
+        )}
+
+        {/* Priority Details Modal */}
+        <PriorityDetailsModal
+          visible={showPriorityModal}
+          message={message}
+          onClose={() => setShowPriorityModal(false)}
+        />
+      </Animated.View>
+
+      {/* RSVP Tracker Card (below invitation messages) */}
+      {rsvpTracker && (
+        <View style={styles.rsvpTrackerContainer}>
+          <RSVPTrackerCard tracker={rsvpTracker} />
         </View>
       )}
-
-      {/* Spacer when no avatar needed in groups (right side) */}
-      {isOwnMessage && isGroupChat && !showAvatar && (
-        <View style={styles.avatarSpacer} />
-      )}
-
-      {/* Priority Details Modal */}
-      <PriorityDetailsModal
-        visible={showPriorityModal}
-        message={message}
-        onClose={() => setShowPriorityModal(false)}
-      />
-    </Animated.View>
+    </View>
   );
 };
 
@@ -450,5 +471,9 @@ const styles = StyleSheet.create({
     color: colors.light.textSecondary,
     textAlign: "center",
     fontStyle: "italic",
+  },
+  rsvpTrackerContainer: {
+    paddingHorizontal: 12,
+    marginTop: 4,
   },
 });

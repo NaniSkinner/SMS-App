@@ -94,6 +94,49 @@ export interface DetectPriorityResponse {
   suggestedResponse?: string;
 }
 
+export interface DetectInvitationRequest {
+  messageText: string;
+  conversationId: string;
+  senderId: string;
+  timezone?: string;
+}
+
+export interface DetectInvitationResponse {
+  isInvitation: boolean;
+  invitationType?:
+    | "party"
+    | "meeting"
+    | "playdate"
+    | "event"
+    | "activity"
+    | "other";
+  eventTitle?: string;
+  eventDate?: string;
+  eventTime?: string;
+  eventLocation?: string;
+  invitationText?: string;
+  requiresRSVP: boolean;
+  rsvpDeadline?: string;
+  confidence: number; // 0-1
+}
+
+export interface DetectRSVPRequest {
+  messageText: string;
+  invitationText: string;
+  senderId: string;
+  senderName?: string;
+  conversationId: string;
+}
+
+export interface DetectRSVPResponse {
+  isRSVP: boolean;
+  rsvpStatus?: "yes" | "no" | "maybe";
+  confidence: number; // 0-1
+  reason?: string;
+  numberOfPeople?: number; // e.g., "We can come" = 2+
+  conditions?: string; // e.g., "Only if it's after 3pm"
+}
+
 // AI/OpenAI Types
 export interface ConversationTurn {
   role: "system" | "user" | "assistant";
