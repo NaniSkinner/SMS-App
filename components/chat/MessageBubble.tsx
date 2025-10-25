@@ -3,10 +3,12 @@
  * Displays a single message with proper styling and status
  */
 
+import { PriorityBadge } from "@/components/chat/PriorityBadge";
+import { PriorityDetailsModal } from "@/components/chat/PriorityDetailsModal";
 import { Avatar } from "@/components/common/Avatar";
 import { colors } from "@/theme/colors";
 import { Message } from "@/types";
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   Animated,
@@ -44,6 +46,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
 }) => {
   const slideAnim = useRef(new Animated.Value(20)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [showPriorityModal, setShowPriorityModal] = useState(false);
 
   // Slide and fade in animation on mount
   useEffect(() => {
@@ -191,6 +194,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           isOwnMessage && styles.bubbleContainerOwn,
         ]}
       >
+        {/* Priority Badge */}
+        {message.priority && message.priority !== "none" && (
+          <View style={styles.priorityContainer}>
+            <PriorityBadge
+              priority={message.priority}
+              size="small"
+              onPress={() => setShowPriorityModal(true)}
+            />
+          </View>
+        )}
+
         {/* Sender name for group messages (all messages) */}
         {isGroupChat && senderName && (
           <Text
@@ -283,6 +297,13 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       {isOwnMessage && isGroupChat && !showAvatar && (
         <View style={styles.avatarSpacer} />
       )}
+
+      {/* Priority Details Modal */}
+      <PriorityDetailsModal
+        visible={showPriorityModal}
+        message={message}
+        onClose={() => setShowPriorityModal(false)}
+      />
     </Animated.View>
   );
 };
@@ -315,6 +336,9 @@ const styles = StyleSheet.create({
   },
   bubbleContainerOwn: {
     alignItems: "flex-end",
+  },
+  priorityContainer: {
+    marginBottom: 4,
   },
   senderName: {
     fontSize: 12,

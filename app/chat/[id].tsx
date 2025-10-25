@@ -85,10 +85,19 @@ export default function ChatScreen() {
   const [decisionSummary, setDecisionSummary] =
     useState<DecisionSummary | null>(null);
   const [isSummarizing, setIsSummarizing] = useState(false);
+  const [priorityFilter, setPriorityFilter] = useState<
+    "all" | "high" | "medium"
+  >("all");
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
   const conversationMessages = messages[conversationId] || [];
+
+  // Filter messages by priority
+  const filteredMessages =
+    priorityFilter === "all"
+      ? conversationMessages
+      : conversationMessages.filter((msg) => msg.priority === priorityFilter);
 
   // Get other user ID for direct conversations
   const otherUserId =
@@ -693,6 +702,64 @@ export default function ChatScreen() {
         )}
       </View>
 
+      {/* Priority Filter Chips (Group Chats Only) */}
+      {conversation?.type === "group" && (
+        <View style={styles.filterContainer}>
+          <Pressable
+            onPress={() => setPriorityFilter("all")}
+            style={[
+              styles.filterChip,
+              priorityFilter === "all" && styles.filterChipActive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                priorityFilter === "all" && styles.filterChipTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setPriorityFilter("high")}
+            style={[
+              styles.filterChip,
+              styles.filterChipHigh,
+              priorityFilter === "high" && styles.filterChipActive,
+            ]}
+          >
+            <Text style={styles.filterChipIcon}>🚨</Text>
+            <Text
+              style={[
+                styles.filterChipText,
+                priorityFilter === "high" && styles.filterChipTextActive,
+              ]}
+            >
+              Urgent
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setPriorityFilter("medium")}
+            style={[
+              styles.filterChip,
+              styles.filterChipMedium,
+              priorityFilter === "medium" && styles.filterChipActive,
+            ]}
+          >
+            <Text style={styles.filterChipIcon}>⚠️</Text>
+            <Text
+              style={[
+                styles.filterChipText,
+                priorityFilter === "medium" && styles.filterChipTextActive,
+              ]}
+            >
+              Important
+            </Text>
+          </Pressable>
+        </View>
+      )}
+
       {/* Error Banner */}
       {error && (
         <View style={styles.errorBanner}>
@@ -704,7 +771,7 @@ export default function ChatScreen() {
       <View style={styles.messagesContainer}>
         {user && (
           <MessageList
-            messages={conversationMessages}
+            messages={filteredMessages}
             currentUserId={user.id}
             conversation={conversation}
             isLoading={isLoadingMessages}
@@ -898,6 +965,47 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "600",
     color: colors.light.primary,
+  },
+  filterContainer: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 8,
+    backgroundColor: colors.light.backgroundSecondary,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light.border,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: colors.light.background,
+    borderWidth: 1,
+    borderColor: colors.light.border,
+    gap: 4,
+  },
+  filterChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  filterChipHigh: {
+    // Specific styling if needed
+  },
+  filterChipMedium: {
+    // Specific styling if needed
+  },
+  filterChipText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.light.textSecondary,
+  },
+  filterChipTextActive: {
+    color: "#FFFFFF",
+  },
+  filterChipIcon: {
+    fontSize: 14,
   },
   errorBanner: {
     backgroundColor: colors.error + "20",

@@ -460,3 +460,99 @@ TIMELINE INFO:
     );
   }
 }
+
+/**
+ * Detect message priority/urgency level
+ */
+export async function detectMessagePriority(
+  messageText: string,
+  timezone: string = "America/Chicago"
+): Promise<any> {
+  try {
+    const client = await getClient();
+
+    // Get current date/time in user's timezone
+    const now = new Date();
+    const currentDate = now.toLocaleDateString("en-US", {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      timeZone: timezone,
+    });
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timezone,
+    });
+
+    const prompt = `Analyze this message and determine its priority/urgency level for a busy parent managing family schedules.
+
+CURRENT DATE: ${currentDate}
+CURRENT TIME: ${currentTime}
+
+Message: "${messageText}"
+
+Output JSON format:
+{
+  "priority": "high" | "medium" | "low" | "none",
+  "reason": string (one sentence explaining why),
+  "urgencyFactors": string[] (list of factors that make this urgent),
+  "actionRequired": boolean (does this need immediate action?),
+  "confidence": number (0-1),
+  "suggestedResponse": string (optional: suggested user response if urgent)
+}
+
+PRIORITY LEVELS:
+- **high**: Immediate attention needed (emergencies, safety issues, time-critical actions due today/now)
+  Examples: "URGENT", "EMERGENCY", "ASAP", "NOW", "school closes early", "pick up sick child", "appointment in 1 hour"
+  
+- **medium**: Important but not immediate (tasks due soon, coordination needed, actionable items)
+  Examples: "by end of day", "tonight", "tomorrow morning", "need to decide", "form due Friday", "doctor appointment next week"
+  
+- **low**: Informational but worth noting (reminders, updates, non-urgent requests)
+  Examples: "FYI", "reminder", "just checking", "next month", "when you get a chance"
+  
+- **none**: Normal conversation, no urgency (greetings, social chat, questions with no deadline)
+  Examples: "how are you?", "thanks!", "sounds good", "maybe we should", general discussion
+
+URGENCY INDICATORS:
+- Time pressure: "today", "tonight", "now", "ASAP", "in X hours", "by [time]"
+- Action required: "MUST", "NEED TO", "HAVE TO", "required", "mandatory", "please respond"
+- Problems: "emergency", "urgent", "critical", "problem", "issue", "broken", "not working", "help needed"
+- Health/Safety: "sick", "injured", "doctor", "hospital", "accident", "911"
+- School/Childcare: "school", "pickup", "daycare", "teacher", "class", "early dismissal"
+- Deadlines: "due", "deadline", "expires", "closes", "ends", "last chance"
+- Caps/emphasis: UPPERCASE words, multiple exclamation marks
+
+CONTEXT:
+- This is for busy parents coordinating family schedules
+- Higher priority for immediate family needs (children, health, safety)
+- Lower priority for social planning, general questions, casual conversation
+- Consider time sensitivity relative to CURRENT DATE/TIME above
+
+Be conservative: only flag as "high" if truly urgent, most messages should be "none" or "low".`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.2, // Very low temperature for consistent priority detection
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new AppError("No response from OpenAI", 500, "NO_RESPONSE");
+    }
+
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("❌ Priority detection error:", error);
+    throw new AppError(
+      `Priority detection failed: ${error.message}`,
+      500,
+      "PRIORITY_DETECTION_ERROR"
+    );
+  }
+}

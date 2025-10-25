@@ -75,6 +75,18 @@ export const getMessages = async (
         status: data.status as MessageStatus,
         readBy: data.readBy || [],
         createdAt: convertToDate(data.createdAt) || new Date(),
+        // Priority fields
+        priority: data.priority as
+          | "high"
+          | "medium"
+          | "low"
+          | "none"
+          | undefined,
+        priorityReason: data.priorityReason,
+        priorityDetectedAt: convertToDate(data.priorityDetectedAt),
+        urgencyFactors: data.urgencyFactors,
+        actionRequired: data.actionRequired,
+        priorityConfidence: data.priorityConfidence,
       };
     });
 
@@ -214,6 +226,18 @@ export const subscribeToMessages = (
           status: data.status as MessageStatus,
           readBy: data.readBy || [],
           createdAt: convertToDate(data.createdAt) || new Date(),
+          // Priority fields
+          priority: data.priority as
+            | "high"
+            | "medium"
+            | "low"
+            | "none"
+            | undefined,
+          priorityReason: data.priorityReason,
+          priorityDetectedAt: convertToDate(data.priorityDetectedAt),
+          urgencyFactors: data.urgencyFactors,
+          actionRequired: data.actionRequired,
+          priorityConfidence: data.priorityConfidence,
         };
       });
 

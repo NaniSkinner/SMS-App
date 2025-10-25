@@ -433,6 +433,97 @@ export const summarizeDecision = async (
 };
 
 /**
+ * Detect message priority
+ * Analyzes a message to determine its urgency level
+ */
+export const detectPriority = async (
+  messageText: string,
+  messageId: string,
+  conversationId: string,
+  userId?: string,
+  timezone?: string
+): Promise<
+  ApiResponse<{
+    hasPriority: boolean;
+    priority: "high" | "medium" | "low" | "none";
+    reason?: string;
+    urgencyFactors?: string[];
+    actionRequired?: boolean;
+    confidence?: number;
+  }>
+> => {
+  try {
+    console.log("🚨 Detecting priority for message:", messageId);
+
+    const requestBody = {
+      messageText,
+      messageId,
+      conversationId,
+      userId,
+      timezone: timezone || "America/Chicago",
+    };
+
+    const response = await executeWithRetry(async () => {
+      return await fetchWithTimeout(
+        `${AI_API_BASE_URL}/ai/detect-priority`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(requestBody),
+        },
+        REQUEST_TIMEOUT
+      );
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw {
+        message: errorData.error || "Priority detection failed",
+        statusCode: response.status,
+        code: errorData.code,
+      };
+    }
+
+    const data = await response.json();
+
+    console.log(
+      `✅ Priority detection complete: ${data.priority}`,
+      data.hasPriority ? `- "${data.reason}"` : ""
+    );
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error: any) {
+    console.error("❌ Priority detection error:", error);
+
+    // User-friendly error messages
+    let errorMessage = "Failed to detect priority. Please try again.";
+
+    if (error.code === "RATE_LIMIT_EXCEEDED") {
+      errorMessage = "Too many requests. Please wait a moment and try again.";
+    } else if (error.message?.includes("timeout")) {
+      errorMessage =
+        "Request timed out. The AI service is taking too long to respond.";
+    } else if (error.message?.includes("Network request failed")) {
+      errorMessage =
+        "Network error. Please check your internet connection and try again.";
+    } else if (error.statusCode >= 500) {
+      errorMessage =
+        "Priority detection service is temporarily unavailable. Please try again.";
+    }
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+};
+
+/**
  * Health check for AI service
  */
 export const checkAIServiceHealth = async (): Promise<boolean> => {

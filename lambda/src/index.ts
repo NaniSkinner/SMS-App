@@ -9,6 +9,7 @@ import {
   Context,
 } from "aws-lambda";
 import { handleChat } from "./handlers/chat";
+import { handleDetectPriority } from "./handlers/detectPriority";
 import { handleExtractEvent } from "./handlers/extractEvent";
 import { handleSummarizeDecision } from "./handlers/summarizeDecision";
 import { initializeFirebase } from "./services/firebase";
@@ -97,6 +98,11 @@ export const handler = async (
     // Summarize Decision endpoint
     if (path === "/ai/summarize-decision" && method === "POST") {
       return await handleSummarizeDecision(event);
+    }
+
+    // Detect Priority endpoint
+    if (path === "/ai/detect-priority" && method === "POST") {
+      return await handleDetectPriority(event);
     }
 
     // Detect Conflicts endpoint (placeholder)

@@ -54,6 +54,115 @@ export const onMessageCreated = functions.firestore
       const senderDetails = conversationData.participantDetails[senderId];
       const senderName = senderDetails?.displayName || "Someone";
 
+      // === PRIORITY DETECTION (Group Chats Only) ===
+      let priorityLevel: "high" | "medium" | "low" | "none" = "none";
+      let priorityReason: string | undefined;
+      let priorityDetected = false;
+
+      if (conversationType === "group") {
+        // Pre-filter: Check for urgency keywords
+        const urgencyKeywords = [
+          "urgent",
+          "emergency",
+          "asap",
+          "now",
+          "immediately",
+          "critical",
+          "911",
+          "today",
+          "tonight",
+          "must",
+          "need to",
+          "have to",
+          "required",
+          "mandatory",
+          "problem",
+          "issue",
+          "broken",
+          "not working",
+          "help",
+          "sick",
+          "doctor",
+          "hospital",
+          "school",
+          "pickup",
+          "early",
+          "due",
+          "deadline",
+          "reminder",
+          "remind",
+          "don't forget",
+          "remember",
+        ];
+
+        const messageTextLower = messageText.toLowerCase();
+        const hasUrgencyKeyword = urgencyKeywords.some((keyword) =>
+          messageTextLower.includes(keyword)
+        );
+
+        // Only call Lambda if urgency keyword detected
+        if (hasUrgencyKeyword) {
+          console.log("🔍 Urgency keyword detected, analyzing priority...");
+
+          try {
+            // Call Lambda priority detection endpoint
+            const lambdaUrl =
+              functions.config().lambda?.api_url ||
+              process.env.LAMBDA_API_URL ||
+              "";
+            const response = await fetch(`${lambdaUrl}/ai/detect-priority`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                messageText,
+                messageId,
+                conversationId,
+                userId: senderId,
+                timezone: "America/Chicago", // TODO: Get from user preferences
+              }),
+            });
+
+            if (response.ok) {
+              const priorityData = await response.json();
+
+              if (
+                priorityData.hasPriority &&
+                priorityData.priority !== "none"
+              ) {
+                priorityLevel = priorityData.priority;
+                priorityReason = priorityData.reason;
+                priorityDetected = true;
+
+                // Update message document with priority fields
+                await snapshot.ref.update({
+                  priority: priorityLevel,
+                  priorityReason: priorityReason,
+                  priorityDetectedAt:
+                    admin.firestore.FieldValue.serverTimestamp(),
+                  urgencyFactors: priorityData.urgencyFactors || [],
+                  actionRequired: priorityData.actionRequired || false,
+                  priorityConfidence: priorityData.confidence || 0,
+                });
+
+                console.log(
+                  `✅ Priority detected: ${priorityLevel} - "${priorityReason}"`
+                );
+              }
+            } else {
+              console.warn(
+                "⚠️ Priority detection failed:",
+                response.statusText
+              );
+            }
+          } catch (error) {
+            console.error("❌ Error calling priority detection:", error);
+            // Non-blocking: Continue with normal notification flow
+          }
+        }
+      }
+
       // Get recipients (exclude sender)
       const recipientIds = participants.filter((id) => id !== senderId);
 
@@ -123,10 +232,19 @@ export const onMessageCreated = functions.firestore
           body = messageText;
         }
 
+        // Add priority indicator for high priority messages
+        if (priorityDetected && priorityLevel === "high") {
+          title = `🚨 ${title}`;
+          // Optionally prepend "URGENT" to body
+          // body = `URGENT: ${body}`;
+        } else if (priorityDetected && priorityLevel === "medium") {
+          title = `⚠️ ${title}`;
+        }
+
         // Create push message
         messages.push({
           to: pushToken,
-          sound: "default",
+          sound: priorityLevel === "high" ? "default" : "default", // Could use different sound
           title: title,
           body: body.length > 100 ? body.substring(0, 97) + "..." : body,
           data: {
@@ -136,10 +254,12 @@ export const onMessageCreated = functions.firestore
             messageText,
             conversationType,
             groupName,
+            priority: priorityLevel, // Include priority in notification data
+            priorityReason: priorityReason,
           },
           badge: 1, // Will be updated by client based on actual unread count
-          priority: "high",
-          channelId: "messages", // For Android
+          priority: priorityLevel === "high" ? "high" : "default", // Expo priority
+          channelId: priorityLevel === "high" ? "urgent-messages" : "messages", // For Android
         });
       }
 

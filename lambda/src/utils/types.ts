@@ -76,6 +76,24 @@ export interface SummarizeDecisionResponse {
   message?: string; // For when no decision is found
 }
 
+export interface DetectPriorityRequest {
+  messageText: string;
+  messageId: string;
+  conversationId: string;
+  userId?: string;
+  timezone?: string;
+}
+
+export interface DetectPriorityResponse {
+  hasPriority: boolean;
+  priority: "high" | "medium" | "low" | "none";
+  reason?: string;
+  urgencyFactors?: string[];
+  actionRequired?: boolean;
+  confidence?: number; // 0-1
+  suggestedResponse?: string;
+}
+
 // AI/OpenAI Types
 export interface ConversationTurn {
   role: "system" | "user" | "assistant";

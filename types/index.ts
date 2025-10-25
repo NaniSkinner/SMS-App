@@ -46,6 +46,13 @@ export interface Message {
   status: MessageStatus;
   readBy: string[]; // Array of user IDs who read the message
   createdAt: Date;
+  // Priority detection fields
+  priority?: "high" | "medium" | "low" | "none";
+  priorityReason?: string;
+  priorityDetectedAt?: Date;
+  urgencyFactors?: string[];
+  actionRequired?: boolean;
+  priorityConfidence?: number;
 }
 
 export interface OptimisticMessage extends Message {
