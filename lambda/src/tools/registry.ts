@@ -123,23 +123,32 @@ const getCalendarEvents: Tool = {
     } catch (error: any) {
       console.error("❌ getCalendarEvents error:", error);
 
-      // Provide helpful error messages based on error type
+      // ✅ Enhanced error handling for specific token issues
       let userMessage = error.message;
-      if (
+      let requiresReauth = false;
+
+      if (error.message.includes("CALENDAR_AUTH_EXPIRED")) {
+        userMessage =
+          "Your calendar connection has expired and needs to be reconnected. This happens automatically for security reasons. Please disconnect and reconnect your Google Calendar in the app to continue.";
+        requiresReauth = true;
+      } else if (
         error.message.includes("re-authenticate") ||
         error.message.includes("Calendar not connected")
       ) {
         userMessage =
           "It seems that I can't access your calendar at the moment because of an authentication issue. You might need to reconnect or re-authenticate your calendar to grant access.";
+        requiresReauth = true;
       } else if (error.message.includes("refresh")) {
         userMessage =
           "I'm having trouble refreshing your calendar access. Please disconnect and reconnect your Google Calendar in the app.";
+        requiresReauth = true;
       }
 
       return {
         success: false,
         error: userMessage,
-        hint: "Please go to your profile and reconnect your Google Calendar.",
+        requiresReauth,
+        hint: "Please go to the AI chat screen and use the 'Reset Connection' or 'Disconnect' button to reconnect your Google Calendar.",
       };
     }
   },
@@ -242,10 +251,29 @@ const createCalendarEvent_Tool: Tool = {
       };
     } catch (error: any) {
       console.error("❌ createCalendarEvent error:", error);
+
+      // ✅ Enhanced error handling for token issues
+      let userMessage = error.message;
+      let requiresReauth = false;
+
+      if (error.message.includes("CALENDAR_AUTH_EXPIRED")) {
+        userMessage =
+          "Your calendar connection has expired. Please reconnect your Google Calendar to create events.";
+        requiresReauth = true;
+      } else if (
+        error.message.includes("re-authenticate") ||
+        error.message.includes("access denied")
+      ) {
+        userMessage =
+          "I couldn't create the event due to an authentication issue. Please reconnect your calendar.";
+        requiresReauth = true;
+      }
+
       return {
         success: false,
-        error: error.message,
-        hint: "The event could not be created. The user may need to reconnect their calendar.",
+        error: userMessage,
+        requiresReauth,
+        hint: "Please use the 'Reset Connection' button in the AI chat screen to reconnect your Google Calendar.",
       };
     }
   },
@@ -374,9 +402,28 @@ const detectConflicts_Tool: Tool = {
       };
     } catch (error: any) {
       console.error("❌ detectConflicts error:", error);
+
+      // ✅ Enhanced error handling for token issues
+      let userMessage = error.message;
+      let requiresReauth = false;
+
+      if (error.message.includes("CALENDAR_AUTH_EXPIRED")) {
+        userMessage =
+          "Your calendar connection has expired. Please reconnect your Google Calendar to check for conflicts.";
+        requiresReauth = true;
+      } else if (
+        error.message.includes("re-authenticate") ||
+        error.message.includes("access denied")
+      ) {
+        userMessage =
+          "I couldn't check for conflicts due to an authentication issue. Please reconnect your calendar.";
+        requiresReauth = true;
+      }
+
       return {
         success: false,
-        error: error.message,
+        error: userMessage,
+        requiresReauth,
       };
     }
   },

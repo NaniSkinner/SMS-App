@@ -474,6 +474,32 @@ export default function AIChatScreen() {
         </View>
       )}
 
+      {/* Calendar connected banner - shows when connected (with disconnect option) */}
+      {calendarConnected && !checkingCalendar && messages.length > 0 && (
+        <View style={[styles.calendarBanner, { backgroundColor: "#E6F7E6" }]}>
+          <View style={styles.calendarBannerContent}>
+            <Ionicons name="calendar" size={20} color={colors.primary} />
+            <Text style={styles.calendarBannerText}>✅ Calendar Connected</Text>
+          </View>
+          <TouchableOpacity
+            style={[
+              styles.connectBannerButton,
+              { borderColor: colors.light.error },
+            ]}
+            onPress={handleResetConnection}
+          >
+            <Text
+              style={[
+                styles.connectBannerButtonText,
+                { color: colors.light.error },
+              ]}
+            >
+              Reset
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {messages.length === 0 ? (
         renderEmptyState()
       ) : (

@@ -51,6 +51,8 @@ const PREFETCH_DEBOUNCE = 30 * 1000; // 30 seconds between prefetches for same u
  */
 async function getOAuthClient(userId: string) {
   try {
+    console.log(`🔐 Getting OAuth client for user: ${userId}`);
+
     // Get iOS OAuth credentials from Secrets Manager
     // ⚠️ MUST be the SAME iOS client that the app uses
     const credentials = await getGoogleOAuthCredentials();
@@ -67,13 +69,11 @@ async function getOAuthClient(userId: string) {
       console.error(`   See OAuth/IMPORTANT.md for fix instructions.`);
     }
 
-    // Validate client secret exists
+    // Note: iOS clients using PKCE don't have client secrets
+    // Token refresh works with just client_id + refresh_token
     if (!client_secret) {
-      console.error(`⚠️ ERROR: No client secret found!`);
-      console.error(
-        `   iOS OAuth clients have secrets for server-side token refresh.`
-      );
-      throw new Error("Missing OAuth client secret");
+      console.log(`ℹ️  No client secret (PKCE-based iOS OAuth client)`);
+      console.log(`   Token refresh will use client_id + refresh_token only`);
     }
 
     // Create OAuth2 client with iOS client credentials
@@ -96,13 +96,30 @@ async function getOAuthClient(userId: string) {
       .get();
 
     if (!tokenDoc.exists) {
+      console.error(`❌ No calendar tokens found for user ${userId}`);
       throw new Error("Calendar not connected. User needs to authenticate.");
     }
 
     const tokenData = tokenDoc.data();
     if (!tokenData) {
+      console.error(`❌ Empty token data for user ${userId}`);
       throw new Error("Invalid token data");
     }
+
+    // ✅ Enhanced logging for debugging token issues
+    console.log(`📋 Token info for user ${userId}:`);
+    console.log(`   Has access token: ${!!tokenData.accessToken}`);
+    console.log(`   Has refresh token: ${!!tokenData.refreshToken}`);
+    console.log(
+      `   Granted at: ${
+        tokenData.grantedAt?.toDate?.()?.toISOString() || "unknown"
+      }`
+    );
+    console.log(
+      `   Last updated: ${
+        tokenData.updatedAt?.toDate?.()?.toISOString() || "unknown"
+      }`
+    );
 
     // Set credentials
     // Handle Firestore Timestamp conversion properly
@@ -139,12 +156,32 @@ async function getOAuthClient(userId: string) {
 
     if (expiryDate <= now) {
       console.log("🔄 Access token expired, refreshing...");
+      console.log(`   Expired at: ${expiryDate.toISOString()}`);
+      console.log(`   Current time: ${now.toISOString()}`);
+
+      // ✅ FIX: Check if refresh token exists before attempting refresh
+      if (!tokenData.refreshToken) {
+        console.error(
+          "❌ No refresh token available - user needs to re-authenticate"
+        );
+
+        // Clear invalid tokens from Firestore
+        await db
+          .collection("users")
+          .doc(userId)
+          .collection("tokens")
+          .doc("google")
+          .delete();
+
+        throw new Error("CALENDAR_AUTH_EXPIRED");
+      }
 
       try {
         const { credentials } = await oauth2Client.refreshAccessToken();
         oauth2Client.setCredentials(credentials);
 
-        // Update tokens in Firestore
+        // ✅ FIX: Save new refresh token if Google issues one
+        // Google sometimes rotates refresh tokens for security
         const newExpiresAt = new Date(credentials.expiry_date || 0);
         await db
           .collection("users")
@@ -153,15 +190,59 @@ async function getOAuthClient(userId: string) {
           .doc("google")
           .update({
             accessToken: credentials.access_token,
+            refreshToken: credentials.refresh_token || tokenData.refreshToken, // Keep old if new not provided
             expiresAt: newExpiresAt,
             updatedAt: new Date(),
           });
 
         console.log("✅ Token refreshed successfully");
-      } catch (refreshError) {
+        console.log(`   New expiry: ${newExpiresAt.toISOString()}`);
+        console.log(`   Refresh token updated: ${!!credentials.refresh_token}`);
+      } catch (refreshError: any) {
         console.error("❌ Token refresh failed:", refreshError);
+        console.error("   Error details:", {
+          message: refreshError.message,
+          code: refreshError.code,
+          status: refreshError.status,
+        });
+
+        // ✅ FIX: Detect invalid/revoked tokens and clear them
+        const errorMessage = refreshError.message?.toLowerCase() || "";
+        const isInvalidToken =
+          errorMessage.includes("invalid_grant") ||
+          errorMessage.includes("revoked") ||
+          errorMessage.includes("unauthorized_client") ||
+          refreshError.code === 401 ||
+          refreshError.code === 403;
+
+        if (isInvalidToken) {
+          console.log(
+            "🗑️ Detected invalid/revoked token - clearing from Firestore"
+          );
+
+          try {
+            // Clear stale tokens from Firestore
+            await db
+              .collection("users")
+              .doc(userId)
+              .collection("tokens")
+              .doc("google")
+              .delete();
+
+            console.log("✅ Stale tokens cleared successfully");
+          } catch (deleteError) {
+            console.error("⚠️ Failed to clear stale tokens:", deleteError);
+          }
+
+          // Throw specific error code for app to handle
+          throw new Error(
+            "CALENDAR_AUTH_EXPIRED: Your calendar connection has expired. Please reconnect your Google Calendar."
+          );
+        }
+
+        // For other errors (network issues, etc), throw generic error
         throw new Error(
-          "Failed to refresh calendar access token. User needs to re-authenticate."
+          "Failed to refresh calendar access token. Please try again or reconnect your calendar."
         );
       }
     }
@@ -175,20 +256,26 @@ async function getOAuthClient(userId: string) {
 
 /**
  * Get Calendar API client for a user
+ * ⚠️ FIX: Removed persistent client caching to prevent stale token issues
+ *
+ * Previously, clients were cached indefinitely, causing expired tokens to persist
+ * even after the token expired. Now we always get a fresh OAuth client which
+ * validates and refreshes tokens as needed.
+ *
+ * Performance impact: ~50ms per request vs instant cache hit, but this ensures
+ * token freshness and prevents the "calendar access lost after several minutes" bug.
  */
 async function getCalendarClient(
   userId: string
 ): Promise<calendar_v3.Calendar> {
-  // Check cache first
-  if (clientCache.has(userId)) {
-    return clientCache.get(userId)!;
-  }
-
+  // ✅ FIX: Always get fresh OAuth client with token validation
+  // This ensures tokens are checked for expiry and refreshed if needed
   const auth = await getOAuthClient(userId);
   const calendar = google.calendar({ version: "v3", auth });
 
-  // Cache the client
-  clientCache.set(userId, calendar);
+  // Note: We intentionally DO NOT cache the client here anymore
+  // Caching caused stale tokens to persist across Lambda container reuse
+  // If performance becomes an issue, we can implement smart cache invalidation
 
   return calendar;
 }
