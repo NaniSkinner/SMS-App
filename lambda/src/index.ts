@@ -10,6 +10,7 @@ import {
 } from "aws-lambda";
 import { handleChat } from "./handlers/chat";
 import { handleExtractEvent } from "./handlers/extractEvent";
+import { handleSummarizeDecision } from "./handlers/summarizeDecision";
 import { initializeFirebase } from "./services/firebase";
 
 // Initialize Firebase on cold start
@@ -91,6 +92,11 @@ export const handler = async (
     // Extract Event endpoint
     if (path === "/ai/extract-event" && method === "POST") {
       return await handleExtractEvent(event);
+    }
+
+    // Summarize Decision endpoint
+    if (path === "/ai/summarize-decision" && method === "POST") {
+      return await handleSummarizeDecision(event);
     }
 
     // Detect Conflicts endpoint (placeholder)

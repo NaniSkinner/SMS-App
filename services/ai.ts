@@ -9,6 +9,8 @@ import {
   AIChatResponse,
   AIExtractEventRequest,
   AIExtractEventResponse,
+  AISummarizeDecisionRequest,
+  AISummarizeDecisionResponse,
   ApiResponse,
 } from "@/types";
 
@@ -304,6 +306,123 @@ export const extractEventFromText = async (
     } else if (error.statusCode >= 500) {
       errorMessage =
         "Event extraction service is temporarily unavailable. Please try again.";
+    }
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
+  }
+};
+
+/**
+ * Summarize decision from group chat messages
+ * Includes input validation, retry logic, and timeout handling
+ */
+export const summarizeDecision = async (
+  userId: string,
+  conversationId: string,
+  messages: Array<{ senderId: string; text: string; timestamp: string }>,
+  participantNames?: { [userId: string]: string }
+): Promise<ApiResponse<AISummarizeDecisionResponse>> => {
+  try {
+    // Validate input
+    if (!userId || userId.trim().length === 0) {
+      return {
+        success: false,
+        error: "User ID is required",
+      };
+    }
+
+    if (!conversationId || conversationId.trim().length === 0) {
+      return {
+        success: false,
+        error: "Conversation ID is required",
+      };
+    }
+
+    if (!messages || messages.length === 0) {
+      return {
+        success: false,
+        error: "Messages are required",
+      };
+    }
+
+    // Detect user's timezone automatically
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const request: AISummarizeDecisionRequest = {
+      userId,
+      conversationId,
+      messages,
+      participantNames,
+      timezone,
+    };
+
+    console.log("💡 Summarizing decision from chat:", {
+      userId,
+      conversationId,
+      messageCount: messages.length,
+      timezone,
+    });
+
+    // Execute with retry logic
+    const data = await executeWithRetry(async () => {
+      const response = await fetchWithTimeout(
+        `${AI_API_BASE_URL}/ai/summarize-decision`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(request),
+        },
+        REQUEST_TIMEOUT
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error(
+          "❌ Decision summarization error:",
+          response.status,
+          errorText
+        );
+
+        const error: any = new Error(
+          `Decision summarization failed: ${
+            response.status
+          } - ${errorText.substring(0, 100)}`
+        );
+        error.statusCode = response.status;
+        throw error;
+      }
+
+      return await response.json();
+    });
+
+    console.log("✅ Decision summarization response:", {
+      hasDecision: data.hasDecision,
+      question: data.question,
+    });
+
+    return {
+      success: true,
+      data,
+    };
+  } catch (error: any) {
+    console.error("❌ Decision summarization service error:", error);
+
+    // Provide user-friendly error messages
+    let errorMessage = "Failed to summarize decision";
+
+    if (error.message?.includes("timeout")) {
+      errorMessage = "Request timed out. Please try again.";
+    } else if (error.message?.includes("Network request failed")) {
+      errorMessage =
+        "Network error. Please check your internet connection and try again.";
+    } else if (error.statusCode >= 500) {
+      errorMessage =
+        "Decision summarization service is temporarily unavailable. Please try again.";
     }
 
     return {

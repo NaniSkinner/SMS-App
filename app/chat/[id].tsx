@@ -4,11 +4,16 @@
  */
 
 import { ConflictModal } from "@/components/chat/ConflictModal";
+import { DecisionSummaryCard } from "@/components/chat/DecisionSummaryCard";
 import { EventExtractionCard } from "@/components/chat/EventExtractionCard";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
 import { Avatar } from "@/components/common/Avatar";
-import { extractEventFromText, sendAIChat } from "@/services/ai";
+import {
+  extractEventFromText,
+  sendAIChat,
+  summarizeDecision,
+} from "@/services/ai";
 import {
   addToOfflineQueue,
   cacheMessages,
@@ -33,7 +38,8 @@ import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useUIStore } from "@/stores/uiStore";
 import { colors } from "@/theme/colors";
-import { Message } from "@/types";
+import { DecisionSummary, Message } from "@/types";
+import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
@@ -76,6 +82,9 @@ export default function ChatScreen() {
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
+  const [decisionSummary, setDecisionSummary] =
+    useState<DecisionSummary | null>(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -504,6 +513,101 @@ export default function ChatScreen() {
     setAnalysisResult(null);
   };
 
+  // Summarize group decisions
+  const handleSummarizeDecisions = async () => {
+    if (!user || !conversation) return;
+
+    // Only for group chats
+    if (conversation.type !== "group") {
+      console.log("❌ Decision summarization only available for group chats");
+      return;
+    }
+
+    // Need at least 5 messages for meaningful analysis
+    if (conversationMessages.length < 5) {
+      setError(
+        "Not enough messages to summarize. Need at least 5 messages for decision analysis."
+      );
+      setTimeout(() => setError(null), 3000);
+      return;
+    }
+
+    setIsSummarizing(true);
+    setError(null);
+
+    try {
+      console.log("💡 Starting decision summarization...");
+
+      // Prepare messages for analysis (limit to last 50 messages)
+      const messagesToAnalyze = conversationMessages.slice(-50).map((msg) => ({
+        senderId: msg.senderId,
+        text: msg.text,
+        timestamp: msg.timestamp.toISOString(),
+      }));
+
+      // Build participant names map
+      const participantNames: { [userId: string]: string } = {};
+      if (conversation.participantDetails) {
+        Object.entries(conversation.participantDetails).forEach(
+          ([userId, details]) => {
+            participantNames[userId] = details.displayName;
+          }
+        );
+      }
+
+      const result = await summarizeDecision(
+        user.id,
+        conversationId,
+        messagesToAnalyze,
+        participantNames
+      );
+
+      if (result.success && result.data) {
+        if (result.data.hasDecision) {
+          console.log(
+            "✅ Decision found:",
+            result.data.question,
+            "→",
+            result.data.finalDecision
+          );
+          setDecisionSummary({
+            question: result.data.question!,
+            finalDecision: result.data.finalDecision!,
+            participants: result.data.participants!,
+            timeline: result.data.timeline!,
+            confidence: result.data.confidence!,
+            keyMessages: result.data.keyMessages!,
+            consensusLevel: result.data.consensusLevel!,
+          });
+        } else {
+          console.log("ℹ️ No decision found in conversation");
+          setError(
+            result.data.message ||
+              "No clear decision was found in this conversation. Try discussing a specific topic or question."
+          );
+          setTimeout(() => setError(null), 4000);
+        }
+      } else {
+        console.error("❌ Decision summarization failed:", result.error);
+        setError(
+          result.error || "Failed to summarize decision. Please try again."
+        );
+        setTimeout(() => setError(null), 3000);
+      }
+    } catch (error: any) {
+      console.error("❌ Exception during decision summarization:", error);
+      setError("An unexpected error occurred. Please try again.");
+      setTimeout(() => setError(null), 3000);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  // Dismiss decision summary card
+  const handleDismissDecisionSummary = () => {
+    setDecisionSummary(null);
+  };
+
   // Book event anyway despite conflicts
   const handleBookAnyway = async () => {
     await handleAddToCalendar();
@@ -567,6 +671,26 @@ export default function ChatScreen() {
             {headerInfo.subtitle}
           </Text>
         </Pressable>
+        {/* Summarize Decisions Button (Group Chats Only) */}
+        {conversation?.type === "group" && (
+          <Pressable
+            onPress={handleSummarizeDecisions}
+            style={({ pressed }) => [
+              styles.summarizeButton,
+              pressed && styles.summarizeButtonPressed,
+            ]}
+            disabled={isSummarizing}
+          >
+            {isSummarizing ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <>
+                <Ionicons name="people" size={18} color={colors.primary} />
+                <Text style={styles.summarizeButtonText}>Summarize</Text>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>
 
       {/* Error Banner */}
@@ -681,6 +805,16 @@ export default function ChatScreen() {
           </View>
         )}
 
+      {/* Decision Summary Card */}
+      {decisionSummary && (
+        <View style={styles.extractionCardContainer}>
+          <DecisionSummaryCard
+            summary={decisionSummary}
+            onDismiss={handleDismissDecisionSummary}
+          />
+        </View>
+      )}
+
       {/* Conflict Modal */}
       {analysisResult?.event && (
         <ConflictModal
@@ -743,6 +877,27 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.light.textSecondary,
     marginTop: 2,
+  },
+  summarizeButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: colors.light.primaryLight,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.light.primary + "30",
+    gap: 4,
+    marginLeft: 8,
+  },
+  summarizeButtonPressed: {
+    opacity: 0.7,
+    backgroundColor: colors.light.primary + "20",
+  },
+  summarizeButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.light.primary,
   },
   errorBanner: {
     backgroundColor: colors.error + "20",

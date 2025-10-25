@@ -347,3 +347,116 @@ Text: "${messageText}"`;
     );
   }
 }
+
+/**
+ * Summarize group decision from conversation messages
+ */
+export async function summarizeGroupDecision(
+  messages: Array<{ senderId: string; text: string; timestamp: string }>,
+  participantNames: { [userId: string]: string },
+  timezone: string = "America/Chicago"
+): Promise<any> {
+  try {
+    const client = await getClient();
+
+    // Format messages for AI analysis
+    const formattedMessages = messages
+      .map((msg) => {
+        const name = participantNames[msg.senderId] || "Unknown";
+        const time = new Date(msg.timestamp).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: timezone,
+        });
+        return `[${time}] ${name}: ${msg.text}`;
+      })
+      .join("\n");
+
+    // Calculate timeline
+    const firstMessage = messages[0];
+    const lastMessage = messages[messages.length - 1];
+    const startTime = new Date(firstMessage.timestamp);
+    const endTime = new Date(lastMessage.timestamp);
+    const durationMinutes = Math.round(
+      (endTime.getTime() - startTime.getTime()) / (1000 * 60)
+    );
+
+    const prompt = `Analyze this group chat conversation and identify if a decision was made.
+
+CONVERSATION:
+${formattedMessages}
+
+Output JSON format:
+{
+  "hasDecision": boolean,
+  "question": string,
+  "finalDecision": string,
+  "participants": {
+    "agreed": string[],
+    "disagreed": string[],
+    "neutral": string[]
+  },
+  "timeline": {
+    "startTime": "HH:MM AM/PM",
+    "endTime": "HH:MM AM/PM",
+    "durationMinutes": number
+  },
+  "confidence": number (0-1),
+  "keyMessages": string[],
+  "consensusLevel": "unanimous" | "strong" | "moderate" | "weak" | "none"
+}
+
+Rules:
+1. Only return hasDecision=true if there's a clear question and final decision
+2. Question should be concise (e.g., "Where to eat?", "What time to meet?")
+3. Final decision should be the agreed-upon choice
+4. List participant names (not IDs) in agreed/disagreed/neutral arrays
+5. Include 2-3 key messages that led to the decision
+6. Consensus levels:
+   - unanimous: Everyone agreed
+   - strong: 80%+ agreed
+   - moderate: 60-79% agreed
+   - weak: 50-59% agreed
+   - none: No clear majority
+7. Be conservative - if no clear decision, return hasDecision=false
+8. Consider phrases like "let's do X", "sounds good", "I'm in", "agree" as agreement
+9. Consider phrases like "no", "I can't", "prefer Y" as disagreement
+
+TIMELINE INFO:
+- First message: ${startTime.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timezone,
+    })}
+- Last message: ${endTime.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: timezone,
+    })}
+- Duration: ${durationMinutes} minutes`;
+
+    const response = await client.chat.completions.create({
+      model: "gpt-4o",
+      messages: [{ role: "user", content: prompt }],
+      response_format: { type: "json_object" },
+      temperature: 0.3, // Lower temperature for more consistent analysis
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      throw new AppError("No response from OpenAI", 500, "NO_RESPONSE");
+    }
+
+    return JSON.parse(content);
+  } catch (error: any) {
+    console.error("❌ Decision summarization error:", error);
+    throw new AppError(
+      `Decision summarization failed: ${error.message}`,
+      500,
+      "SUMMARIZATION_ERROR"
+    );
+  }
+}

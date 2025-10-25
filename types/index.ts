@@ -345,10 +345,63 @@ export interface AISuggestion {
   conversationId: string;
   userId: string;
   createdAt: Date;
-  type: "event_extracted" | "conflict_detected";
+  type: "event_extracted" | "conflict_detected" | "decision_summary";
   extractedEvent?: AIExtractedEvent;
   conflicts?: CalendarEvent[];
   alternativeTimes?: string[];
   userAction?: "accepted" | "dismissed" | "modified";
   wasHelpful?: boolean;
+}
+
+export interface AISummarizeDecisionRequest {
+  userId: string;
+  conversationId: string;
+  messages: Array<{
+    senderId: string;
+    text: string;
+    timestamp: string; // ISO string
+  }>;
+  participantNames?: { [userId: string]: string };
+  timezone?: string;
+}
+
+export interface DecisionParticipants {
+  agreed: string[];
+  disagreed: string[];
+  neutral: string[];
+}
+
+export interface DecisionTimeline {
+  startTime: string;
+  endTime: string;
+  durationMinutes: number;
+}
+
+export type ConsensusLevel =
+  | "unanimous"
+  | "strong"
+  | "moderate"
+  | "weak"
+  | "none";
+
+export interface DecisionSummary {
+  question: string;
+  finalDecision: string;
+  participants: DecisionParticipants;
+  timeline: DecisionTimeline;
+  confidence: number; // 0-1
+  keyMessages: string[];
+  consensusLevel: ConsensusLevel;
+}
+
+export interface AISummarizeDecisionResponse {
+  hasDecision: boolean;
+  question?: string;
+  finalDecision?: string;
+  participants?: DecisionParticipants;
+  timeline?: DecisionTimeline;
+  confidence?: number;
+  keyMessages?: string[];
+  consensusLevel?: ConsensusLevel;
+  message?: string; // For when no decision is found
 }

@@ -44,6 +44,38 @@ export interface DetectConflictsResponse {
   alternativeTimes?: string[];
 }
 
+export interface SummarizeDecisionRequest {
+  userId: string;
+  conversationId: string;
+  messages: Array<{
+    senderId: string;
+    text: string;
+    timestamp: string; // ISO string
+  }>;
+  participantNames?: { [userId: string]: string };
+  timezone?: string;
+}
+
+export interface SummarizeDecisionResponse {
+  hasDecision: boolean;
+  question?: string;
+  finalDecision?: string;
+  participants?: {
+    agreed: string[];
+    disagreed: string[];
+    neutral: string[];
+  };
+  timeline?: {
+    startTime: string;
+    endTime: string;
+    durationMinutes: number;
+  };
+  confidence?: number; // 0-1
+  keyMessages?: string[];
+  consensusLevel?: "unanimous" | "strong" | "moderate" | "weak" | "none";
+  message?: string; // For when no decision is found
+}
+
 // AI/OpenAI Types
 export interface ConversationTurn {
   role: "system" | "user" | "assistant";
