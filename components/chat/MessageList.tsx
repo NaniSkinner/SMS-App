@@ -6,7 +6,8 @@
 import { MessageBubble } from "@/components/chat/MessageBubble";
 import { colors } from "@/theme/colors";
 import { Conversation, Message } from "@/types";
-import React, { useEffect, useRef } from "react";
+import { useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -35,14 +36,35 @@ export const MessageList: React.FC<MessageListProps> = ({
   onAnalyzeWithAI,
 }) => {
   const flatListRef = useRef<FlatList>(null);
+  const previousMessageCount = useRef(0);
+
+  // Scroll to bottom when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (messages.length > 0) {
+        // Reset the message count so scroll happens on focus
+        previousMessageCount.current = 0;
+        // Scroll to bottom when entering the chat with longer delay
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }, 300);
+      }
+    }, [messages.length])
+  );
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
-      // Small delay to ensure layout is complete
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
+      const hasNewMessages = messages.length > previousMessageCount.current;
+
+      if (hasNewMessages && previousMessageCount.current > 0) {
+        // Longer delay to ensure layout is complete
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 200);
+      }
+
+      previousMessageCount.current = messages.length;
     }
   }, [messages.length]);
 
@@ -159,8 +181,18 @@ export const MessageList: React.FC<MessageListProps> = ({
         </View>
       }
       onContentSizeChange={() => {
-        // Auto-scroll when content size changes
-        flatListRef.current?.scrollToEnd({ animated: false });
+        // Auto-scroll when content size changes (for new messages)
+        if (previousMessageCount.current > 0) {
+          flatListRef.current?.scrollToEnd({ animated: false });
+        }
+      }}
+      onLayout={() => {
+        // Scroll to end when layout completes (initial render)
+        if (messages.length > 0 && previousMessageCount.current === 0) {
+          setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }, 100);
+        }
       }}
     />
   );

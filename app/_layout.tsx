@@ -23,8 +23,12 @@ import {
   ActivityIndicator,
   AppState,
   AppStateStatus,
+  LogBox,
   View,
 } from "react-native";
+
+// Suppress all logs and warnings for production-like experience
+LogBox.ignoreAllLogs(true);
 
 export default function RootLayout() {
   const { user, isAuthenticated, isLoading, initializeAuth } = useAuthStore();

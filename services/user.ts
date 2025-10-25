@@ -242,6 +242,42 @@ export const getAllUsers = async (
 };
 
 /**
+ * Update user profile (display name and/or photo URL)
+ */
+export const updateUserProfile = async (
+  userId: string,
+  updates: {
+    displayName?: string;
+    photoURL?: string | null;
+  }
+): Promise<ApiResponse<void>> => {
+  try {
+    const userRef = doc(db, "users", userId);
+
+    await updateDoc(userRef, {
+      ...(updates.displayName !== undefined && {
+        displayName: updates.displayName,
+      }),
+      ...(updates.photoURL !== undefined && { photoURL: updates.photoURL }),
+    });
+
+    console.log("✅ User profile updated:", userId);
+
+    return {
+      success: true,
+    };
+  } catch (error: any) {
+    console.error("❌ Error updating user profile:", error);
+    return {
+      success: false,
+      error: `Failed to update profile: ${
+        error.message || error.code || "Unknown error"
+      }`,
+    };
+  }
+};
+
+/**
  * Update the user's active conversation ID
  * Used to prevent push notifications when user is viewing a conversation
  */

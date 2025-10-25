@@ -7,6 +7,7 @@ import { ApiResponse, Conversation, ConversationType } from "@/types";
 import {
   addDoc,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   getDocs,
@@ -651,3 +652,42 @@ function convertParticipantDetails(
 
   return converted;
 }
+
+/**
+ * Delete a conversation for a specific user
+ * This removes it from their chat list but doesn't delete it for other participants
+ */
+export const deleteConversationForUser = async (
+  userId: string,
+  conversationId: string
+): Promise<ApiResponse<void>> => {
+  try {
+    console.log(
+      `🗑️ Deleting conversation ${conversationId} for user ${userId}`
+    );
+
+    // Delete the user's conversation reference
+    const userConversationRef = doc(
+      db,
+      "users",
+      userId,
+      "conversations",
+      conversationId
+    );
+    await deleteDoc(userConversationRef);
+
+    console.log(
+      `✅ Successfully deleted conversation from user's list: ${conversationId}`
+    );
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error deleting conversation:", error);
+    return {
+      success: false,
+      error: `Failed to delete conversation: ${
+        error.message || "Unknown error"
+      }`,
+    };
+  }
+};

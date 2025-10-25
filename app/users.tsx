@@ -10,12 +10,14 @@ import { useAuthStore } from "@/stores/authStore";
 import { useChatStore } from "@/stores/chatStore";
 import { colors } from "@/theme/colors";
 import { User } from "@/types";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  SafeAreaView,
   StyleSheet,
   Text,
   View,
@@ -135,29 +137,38 @@ export default function UsersScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centerContainer}>
+      <SafeAreaView style={styles.centerContainer}>
         <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.loadingText}>Loading users...</Text>
-      </View>
+      </SafeAreaView>
     );
   }
 
   if (error) {
     return (
-      <View style={styles.centerContainer}>
+      <SafeAreaView style={styles.centerContainer}>
         <Text style={styles.errorText}>{error}</Text>
         <Pressable style={styles.retryButton} onPress={loadUsers}>
           <Text style={styles.retryButtonText}>Retry</Text>
         </Pressable>
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Select User</Text>
-        <Text style={styles.headerSubtitle}>Start a new conversation</Text>
+        <Pressable onPress={() => router.back()} style={styles.backButton}>
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color={colors.light.textPrimary}
+          />
+        </Pressable>
+        <View style={styles.headerTextContainer}>
+          <Text style={styles.headerTitle}>Select User</Text>
+          <Text style={styles.headerSubtitle}>Start a new conversation</Text>
+        </View>
       </View>
 
       {isCreatingConversation && (
@@ -182,7 +193,7 @@ export default function UsersScreen() {
           </View>
         }
       />
-    </View>
+    </SafeAreaView>
   );
 }
 
@@ -199,10 +210,19 @@ const styles = StyleSheet.create({
     padding: 24,
   },
   header: {
+    flexDirection: "row",
+    alignItems: "center",
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.light.border,
     backgroundColor: colors.light.background,
+  },
+  backButton: {
+    marginRight: 12,
+    padding: 4,
+  },
+  headerTextContainer: {
+    flex: 1,
   },
   headerTitle: {
     fontSize: 20,

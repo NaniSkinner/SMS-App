@@ -5,7 +5,9 @@
 
 import { ConversationListItem } from "@/components/conversation/ConversationListItem";
 import { cacheConversations, getCachedConversations } from "@/services/cache";
+import { deleteAllMessages } from "@/services/chat";
 import {
+  deleteConversationForUser,
   getConversations,
   subscribeToUserConversations,
 } from "@/services/conversations";
@@ -17,6 +19,7 @@ import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -118,6 +121,60 @@ export default function ChatsScreen() {
     router.push("/group/create" as any);
   };
 
+  const handleDeleteMessages = async (conversationId: string) => {
+    if (!user) return;
+
+    console.log(`🗑️ Deleting messages for conversation: ${conversationId}`);
+
+    const result = await deleteAllMessages(conversationId);
+
+    if (result.success) {
+      // Clear local messages
+      const { clearMessages } = useChatStore.getState();
+      clearMessages(conversationId);
+
+      Alert.alert("✅ Success", "All messages have been deleted.");
+
+      // Refresh conversations to update last message
+      await loadConversations();
+    } else {
+      Alert.alert(
+        "❌ Error",
+        result.error || "Failed to delete messages. Please try again."
+      );
+    }
+  };
+
+  const handleDeleteConversation = async (conversationId: string) => {
+    if (!user) return;
+
+    console.log(`🗑️ Deleting conversation: ${conversationId}`);
+
+    const result = await deleteConversationForUser(user.id, conversationId);
+
+    if (result.success) {
+      // Remove from local state
+      const updatedConversations = conversations.filter(
+        (c) => c.id !== conversationId
+      );
+      setConversations(updatedConversations);
+
+      // Clear local messages
+      const { clearMessages } = useChatStore.getState();
+      clearMessages(conversationId);
+
+      Alert.alert(
+        "✅ Success",
+        "Conversation has been removed from your chat list."
+      );
+    } else {
+      Alert.alert(
+        "❌ Error",
+        result.error || "Failed to delete conversation. Please try again."
+      );
+    }
+  };
+
   const renderConversationItem = ({ item }: { item: Conversation }) => {
     if (!user) return null;
     return (
@@ -125,6 +182,8 @@ export default function ChatsScreen() {
         conversation={item}
         currentUserId={user.id}
         unreadCount={unreadCounts[item.id] || 0}
+        onDeleteMessages={handleDeleteMessages}
+        onDeleteConversation={handleDeleteConversation}
       />
     );
   };

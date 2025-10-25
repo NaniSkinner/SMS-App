@@ -470,7 +470,10 @@ export default function ChatScreen() {
   };
 
   // Add event to calendar using AI
-  const handleAddToCalendar = async (alternativeTime?: string) => {
+  const handleAddToCalendar = async (
+    alternativeTime?: string,
+    forceCreate: boolean = false
+  ) => {
     if (!user || !analysisResult?.event) return;
 
     // Check if calendar is connected first
@@ -508,7 +511,9 @@ export default function ChatScreen() {
       }
 
       console.log(
-        `📅 Adding event to calendar: ${event.title} at ${timeToUse}`
+        `📅 Adding event to calendar: ${event.title} at ${timeToUse}${
+          forceCreate ? " (forcing creation despite conflicts)" : ""
+        }`
       );
 
       // Format the time for display (convert 24-hour to 12-hour with AM/PM)
@@ -529,13 +534,16 @@ export default function ChatScreen() {
       console.log(`📤 Formatted time: ${formattedTime}`);
 
       // Create event via AI chat (which calls the createCalendarEvent tool)
+      // If forceCreate is true, explicitly tell the AI to ignore conflicts
       const message = `Create a calendar event titled "${event.title}" on ${
         event.date
       } at ${formattedTime} for ${event.duration} minutes${
         event.location ? ` at location ${event.location}` : ""
-      }${
-        event.description ? ` with description: ${event.description}` : ""
-      }. Please create this event now.`;
+      }${event.description ? ` with description: ${event.description}` : ""}. ${
+        forceCreate
+          ? "IMPORTANT: The user has approved this booking. Create this event regardless of any conflicts or scheduling issues."
+          : "Please create this event now."
+      }`;
 
       console.log(`📤 Sending to AI:`, message);
 
@@ -715,12 +723,17 @@ export default function ChatScreen() {
 
   // Book event anyway despite conflicts
   const handleBookAnyway = async () => {
-    await handleAddToCalendar();
+    // Close the conflict modal first
+    setShowConflictModal(false);
+    // Force create the event, ignoring conflicts
+    await handleAddToCalendar(undefined, true);
   };
 
   // Select alternative time
   const handleSelectAlternative = async (time: string) => {
-    await handleAddToCalendar(time);
+    // Close the conflict modal first
+    setShowConflictModal(false);
+    await handleAddToCalendar(time, false);
   };
 
   // Format typing indicator text

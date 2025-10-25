@@ -9,22 +9,36 @@ import { colors } from "@/theme/colors";
 import { Conversation } from "@/types";
 import { useRouter } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
-import { Animated, Pressable, StyleSheet, Text, View } from "react-native";
+import {
+  Alert,
+  Animated,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 interface ConversationListItemProps {
   conversation: Conversation;
   currentUserId: string;
   unreadCount?: number;
+  onDeleteMessages?: (conversationId: string) => void;
+  onDeleteConversation?: (conversationId: string) => void;
 }
 
 export const ConversationListItem: React.FC<ConversationListItemProps> = ({
   conversation,
   currentUserId,
   unreadCount = 0,
+  onDeleteMessages,
+  onDeleteConversation,
 }) => {
   const router = useRouter();
   const [isOnline, setIsOnline] = useState(false);
   const [lastSeen, setLastSeen] = useState<Date | null>(null);
+  const [showActionModal, setShowActionModal] = useState(false);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const badgeScale = useRef(new Animated.Value(1)).current;
 
@@ -131,11 +145,62 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
     router.push(`/chat/${conversation.id}`);
   };
 
+  const handleLongPress = () => {
+    setShowActionModal(true);
+  };
+
+  const handleDeleteMessages = () => {
+    setShowActionModal(false);
+    Alert.alert(
+      "Delete All Messages",
+      `Are you sure you want to delete all messages in this conversation? This action cannot be undone.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            if (onDeleteMessages) {
+              onDeleteMessages(conversation.id);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleDeleteConversation = () => {
+    setShowActionModal(false);
+    Alert.alert(
+      "Delete Conversation",
+      `Are you sure you want to delete this conversation? It will be removed from your chat list. This action cannot be undone.`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => {
+            if (onDeleteConversation) {
+              onDeleteConversation(conversation.id);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <Animated.View style={{ opacity: fadeAnim }}>
       <Pressable
         style={({ pressed }) => [styles.container, pressed && styles.pressed]}
         onPress={handlePress}
+        onLongPress={handleLongPress}
       >
         <Avatar
           displayName={displayName}
@@ -193,6 +258,54 @@ export const ConversationListItem: React.FC<ConversationListItemProps> = ({
           </View>
         </View>
       </Pressable>
+
+      {/* Action Modal */}
+      <Modal
+        visible={showActionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActionModal(false)}
+      >
+        <Pressable
+          style={styles.actionModalOverlay}
+          onPress={() => setShowActionModal(false)}
+        >
+          <Pressable style={styles.actionModalContent}>
+            <TouchableOpacity
+              style={[styles.actionModalButton, styles.actionModalButtonFirst]}
+              onPress={handleDeleteMessages}
+            >
+              <Text style={styles.actionModalButtonTextDelete}>
+                Delete All Messages
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.actionModalDivider} />
+
+            <TouchableOpacity
+              style={styles.actionModalButton}
+              onPress={handleDeleteConversation}
+            >
+              <Text style={styles.actionModalButtonTextDelete}>
+                Delete Conversation
+              </Text>
+            </TouchableOpacity>
+
+            <View style={styles.actionModalDivider} />
+
+            <TouchableOpacity
+              style={[
+                styles.actionModalButton,
+                styles.actionModalButtonLast,
+                styles.actionModalButtonCancel,
+              ]}
+              onPress={() => setShowActionModal(false)}
+            >
+              <Text style={styles.actionModalButtonTextCancel}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </Animated.View>
   );
 };
@@ -266,5 +379,51 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 12,
     fontWeight: "600",
+  },
+  actionModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  actionModalContent: {
+    backgroundColor: colors.light.background,
+    borderRadius: 14,
+    width: "80%",
+    maxWidth: 300,
+    overflow: "hidden",
+  },
+  actionModalButton: {
+    paddingVertical: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionModalButtonFirst: {
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+  },
+  actionModalButtonLast: {
+    borderBottomLeftRadius: 14,
+    borderBottomRightRadius: 14,
+  },
+  actionModalButtonDelete: {
+    backgroundColor: colors.light.background,
+  },
+  actionModalButtonCancel: {
+    backgroundColor: colors.light.background,
+  },
+  actionModalButtonTextDelete: {
+    fontSize: 17,
+    color: colors.light.error,
+    fontWeight: "600",
+  },
+  actionModalButtonTextCancel: {
+    fontSize: 17,
+    color: colors.primary,
+    fontWeight: "400",
+  },
+  actionModalDivider: {
+    height: 1,
+    backgroundColor: colors.light.border,
   },
 });

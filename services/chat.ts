@@ -20,6 +20,7 @@ import {
   serverTimestamp,
   Unsubscribe,
   updateDoc,
+  writeBatch,
 } from "firebase/firestore";
 import { v4 as uuidv4 } from "uuid";
 import { db } from "./firebase.config";
@@ -282,6 +283,55 @@ export const subscribeToMessages = (
   );
 
   return unsubscribe;
+};
+
+/**
+ * Delete all messages in a conversation
+ */
+export const deleteAllMessages = async (
+  conversationId: string
+): Promise<ApiResponse<void>> => {
+  try {
+    console.log(`🗑️ Deleting all messages in conversation: ${conversationId}`);
+
+    const messagesRef = collection(
+      db,
+      "conversations",
+      conversationId,
+      "messages"
+    );
+    const messagesSnapshot = await getDocs(messagesRef);
+
+    if (messagesSnapshot.empty) {
+      console.log("No messages to delete");
+      return { success: true };
+    }
+
+    // Use batch delete for better performance
+    const batch = writeBatch(db);
+    messagesSnapshot.docs.forEach((doc) => {
+      batch.delete(doc.ref);
+    });
+
+    await batch.commit();
+
+    console.log(`✅ Successfully deleted ${messagesSnapshot.size} messages`);
+
+    // Update conversation's last message to null
+    const conversationRef = doc(db, "conversations", conversationId);
+    await updateDoc(conversationRef, {
+      lastMessage: null,
+      updatedAt: serverTimestamp(),
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error("❌ Error deleting messages:", error);
+    return {
+      success: false,
+      error: `Failed to delete messages: ${error.message || "Unknown error"}`,
+    };
+  }
 };
 
 /**
