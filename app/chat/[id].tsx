@@ -42,10 +42,11 @@ import { colors } from "@/theme/colors";
 import { DecisionSummary, Message } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Linking,
@@ -56,6 +57,61 @@ import {
   Text,
   View,
 } from "react-native";
+
+// Thinking indicator component - shows while AI is analyzing
+const ThinkingIndicator = () => {
+  const dot1Anim = useRef(new Animated.Value(0)).current;
+  const dot2Anim = useRef(new Animated.Value(0)).current;
+  const dot3Anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const createPulseAnimation = (animValue: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(animValue, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+          Animated.timing(animValue, {
+            toValue: 0,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
+
+    const animations = Animated.parallel([
+      createPulseAnimation(dot1Anim, 0),
+      createPulseAnimation(dot2Anim, 200),
+      createPulseAnimation(dot3Anim, 400),
+    ]);
+
+    animations.start();
+
+    return () => animations.stop();
+  }, [dot1Anim, dot2Anim, dot3Anim]);
+
+  return (
+    <View style={styles.thinkingContainer}>
+      <View style={styles.thinkingBubble}>
+        <Ionicons
+          name="sparkles"
+          size={16}
+          color={colors.light.textSecondary}
+          style={styles.thinkingIcon}
+        />
+        <View style={styles.dotsContainer}>
+          <Animated.View style={[styles.dot, { opacity: dot1Anim }]} />
+          <Animated.View style={[styles.dot, { opacity: dot2Anim }]} />
+          <Animated.View style={[styles.dot, { opacity: dot3Anim }]} />
+        </View>
+      </View>
+    </View>
+  );
+};
 
 export default function ChatScreen() {
   const router = useRouter();
@@ -821,6 +877,9 @@ export default function ChatScreen() {
           />
         )}
 
+        {/* AI Analysis Thinking Indicator */}
+        {isAnalyzing && <ThinkingIndicator />}
+
         {/* Typing Indicator */}
         {typingUsers.length > 0 && (
           <View style={styles.typingIndicator}>
@@ -1254,5 +1313,34 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+  },
+  thinkingContainer: {
+    marginBottom: 12,
+    marginTop: 4,
+    marginLeft: 12,
+  },
+  thinkingBubble: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: colors.light.messageReceived,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    borderBottomLeftRadius: 4,
+  },
+  thinkingIcon: {
+    marginRight: 8,
+  },
+  dotsContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.light.textSecondary,
   },
 });

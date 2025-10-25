@@ -11,12 +11,12 @@ import { colors } from "@/theme/colors";
 import { Message, RSVPTracker } from "@/types";
 import React, { useEffect, useRef, useState } from "react";
 import {
-  ActionSheetIOS,
   Animated,
-  Platform,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 
@@ -48,6 +48,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   const slideAnim = useRef(new Animated.Value(20)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [showPriorityModal, setShowPriorityModal] = useState(false);
+  const [showActionModal, setShowActionModal] = useState(false);
 
   // Slide and fade in animation on mount
   useEffect(() => {
@@ -102,42 +103,29 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
     }
   };
 
-  // Handle long press - show action sheet with AI analysis option
+  // Handle long press - show custom action modal
   const handleLongPress = () => {
-    if (Platform.OS === "ios") {
-      const options = [
-        "Copy",
-        "Analyze with AI 🤖", // NEW: AI analysis
-        "Delete",
-        "Cancel",
-      ];
-      const destructiveButtonIndex = 2;
-      const cancelButtonIndex = 3;
+    setShowActionModal(true);
+  };
 
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options,
-          cancelButtonIndex,
-          destructiveButtonIndex,
-          title: "Message Actions",
-        },
-        (buttonIndex: number) => {
-          if (buttonIndex === 0) {
-            // Copy (could implement clipboard)
-            console.log("Copy message:", message.text);
-          } else if (buttonIndex === 1) {
-            // Analyze with AI
-            if (onAnalyzeWithAI) {
-              console.log("🤖 Analyzing message with AI:", message.id);
-              onAnalyzeWithAI(message);
-            }
-          } else if (buttonIndex === 2) {
-            // Delete (could implement)
-            console.log("Delete message:", message.id);
-          }
-        }
-      );
+  const handleCopyMessage = () => {
+    setShowActionModal(false);
+    console.log("Copy message:", message.text);
+    // TODO: Implement clipboard copy
+  };
+
+  const handleAnalyzeWithAI = () => {
+    setShowActionModal(false);
+    if (onAnalyzeWithAI) {
+      console.log("✨ Analyzing message with AI:", message.id);
+      onAnalyzeWithAI(message);
     }
+  };
+
+  const handleDeleteMessage = () => {
+    setShowActionModal(false);
+    console.log("Delete message:", message.id);
+    // TODO: Implement delete
   };
 
   // Render system message
@@ -325,6 +313,44 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           <RSVPTrackerCard tracker={rsvpTracker} />
         </View>
       )}
+
+      {/* Custom Floating Action Modal */}
+      <Modal
+        visible={showActionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowActionModal(false)}
+      >
+        <Pressable
+          style={styles.actionModalOverlay}
+          onPress={() => setShowActionModal(false)}
+        >
+          <Pressable style={styles.actionModalContent}>
+            <TouchableOpacity
+              style={[styles.actionModalButton, styles.actionModalButtonFirst]}
+              onPress={handleCopyMessage}
+            >
+              <Text style={styles.actionModalButtonText}>Copy</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionModalButton, styles.actionModalButtonAI]}
+              onPress={handleAnalyzeWithAI}
+            >
+              <Text style={styles.actionModalButtonTextAI}>
+                ✨ Analyze with AI
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.actionModalButton, styles.actionModalButtonLast]}
+              onPress={handleDeleteMessage}
+            >
+              <Text style={styles.actionModalButtonTextDelete}>Delete</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
@@ -475,5 +501,64 @@ const styles = StyleSheet.create({
   rsvpTrackerContainer: {
     paddingHorizontal: 12,
     marginTop: 4,
+  },
+  actionModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 40,
+  },
+  actionModalContent: {
+    backgroundColor: colors.light.background,
+    borderRadius: 20,
+    width: "100%",
+    maxWidth: 320,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
+    overflow: "hidden", // Ensures buttons respect parent border radius
+  },
+  actionModalButton: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    backgroundColor: colors.light.background,
+  },
+  actionModalButtonFirst: {
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  actionModalButtonAI: {
+    backgroundColor: colors.primary + "15", // Light blue background
+  },
+  actionModalButtonLast: {
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+  },
+  actionModalButtonText: {
+    fontSize: 16,
+    color: colors.light.textPrimary,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  actionModalButtonTextAI: {
+    fontSize: 16,
+    color: colors.primary,
+    textAlign: "center",
+    fontWeight: "600",
+  },
+  actionModalButtonTextDelete: {
+    fontSize: 16,
+    color: colors.error,
+    textAlign: "center",
+    fontWeight: "500",
+  },
+  actionModalButtonTextCancel: {
+    fontSize: 16,
+    color: colors.light.textSecondary,
+    textAlign: "center",
+    fontWeight: "500",
   },
 });

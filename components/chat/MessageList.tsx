@@ -168,7 +168,8 @@ export const MessageList: React.FC<MessageListProps> = ({
 
 const styles = StyleSheet.create({
   listContent: {
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 80, // Extra padding for input area
     flexGrow: 1,
   },
   loadingContainer: {
