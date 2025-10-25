@@ -5,11 +5,6 @@
  */
 
 import { AIMessageBubble } from "@/components/chat/AIMessageBubble";
-import {
-  disconnectCalendar,
-  isCalendarConnected,
-  useGoogleCalendarAuth,
-} from "@/services/googleAuth";
 import { useAIStore } from "@/stores/aiStore";
 import { useAuthStore } from "@/stores/authStore";
 import { colors } from "@/theme/colors";
@@ -18,7 +13,6 @@ import { Ionicons } from "@expo/vector-icons";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   FlatList,
   KeyboardAvoidingView,
@@ -146,12 +140,7 @@ export default function AIChatScreen() {
   // Local UI state (not persisted)
   const [inputText, setInputText] = useState("");
   const [inputHeight, setInputHeight] = useState(40); // Track input height for auto-grow
-  const [calendarConnected, setCalendarConnected] = useState(false);
-  const [checkingCalendar, setCheckingCalendar] = useState(true);
   const flatListRef = useRef<FlatList>(null);
-
-  // Google Calendar OAuth hook
-  const { promptAsync, isLoading: isAuthLoading } = useGoogleCalendarAuth();
 
   // Load conversation history from Firestore on mount
   useEffect(() => {
@@ -159,124 +148,6 @@ export default function AIChatScreen() {
       loadConversation(user.id);
     }
   }, [user?.id, loadConversation]);
-
-  // Check calendar connection status on mount
-  useEffect(() => {
-    checkCalendarConnection();
-  }, []);
-
-  const checkCalendarConnection = async () => {
-    setCheckingCalendar(true);
-    const connected = await isCalendarConnected();
-    setCalendarConnected(connected);
-    setCheckingCalendar(false);
-  };
-
-  const handleConnectCalendar = async () => {
-    try {
-      const result = await promptAsync();
-
-      if (result?.type === "success") {
-        Alert.alert(
-          "✅ Calendar Connected",
-          "Your Google Calendar has been connected successfully!",
-          [{ text: "OK", onPress: () => checkCalendarConnection() }]
-        );
-      } else if (result?.type === "error") {
-        Alert.alert(
-          "❌ Connection Failed",
-          "Failed to connect Google Calendar. Please try again.",
-          [{ text: "OK" }]
-        );
-      }
-    } catch (error) {
-      console.error("Error connecting calendar:", error);
-      Alert.alert(
-        "❌ Error",
-        "An error occurred while connecting your calendar.",
-        [{ text: "OK" }]
-      );
-    }
-  };
-
-  const handleDisconnectCalendar = async () => {
-    Alert.alert(
-      "Disconnect Calendar",
-      "Are you sure you want to disconnect your Google Calendar?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Disconnect",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await disconnectCalendar();
-              setCalendarConnected(false);
-              Alert.alert(
-                "✅ Disconnected",
-                "Your Google Calendar has been disconnected. You can reconnect anytime.",
-                [{ text: "OK" }]
-              );
-            } catch (error) {
-              console.error("Error disconnecting calendar:", error);
-              Alert.alert(
-                "❌ Error",
-                "Failed to disconnect calendar. Please try again.",
-                [{ text: "OK" }]
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
-
-  const handleResetConnection = async () => {
-    Alert.alert(
-      "🔄 Reset Calendar Connection",
-      "This will clear your calendar connection and let you reconnect with fresh credentials. Use this if you're having connection issues.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Reset & Reconnect",
-          onPress: async () => {
-            try {
-              // First disconnect to clear stale tokens
-              await disconnectCalendar();
-              setCalendarConnected(false);
-
-              // Wait a moment for cleanup
-              await new Promise((resolve) => setTimeout(resolve, 500));
-
-              // Then immediately reconnect
-              const result = await promptAsync();
-
-              if (result?.type === "success") {
-                Alert.alert(
-                  "✅ Connection Reset!",
-                  "Your Google Calendar has been reconnected successfully!",
-                  [{ text: "OK", onPress: () => checkCalendarConnection() }]
-                );
-              } else if (result?.type === "error") {
-                Alert.alert(
-                  "❌ Connection Failed",
-                  "Failed to reconnect. Please try connecting again from the button.",
-                  [{ text: "OK" }]
-                );
-              }
-            } catch (error) {
-              console.error("Error resetting connection:", error);
-              Alert.alert(
-                "❌ Error",
-                "Failed to reset connection. Please try again.",
-                [{ text: "OK" }]
-              );
-            }
-          },
-        },
-      ]
-    );
-  };
 
   const handleSendMessage = async () => {
     if (!inputText.trim() || isLoading || !user) {
@@ -369,72 +240,6 @@ export default function AIChatScreen() {
       <Text style={styles.emptyStateHint}>
         Send a message to start chatting with the AI
       </Text>
-
-      {/* Calendar Connection Status */}
-      <View style={styles.calendarSection}>
-        <Ionicons
-          name={calendarConnected ? "calendar" : "calendar-outline"}
-          size={24}
-          color={
-            calendarConnected ? colors.primary : colors.light.textSecondary
-          }
-        />
-        <Text style={styles.calendarStatusText}>
-          {checkingCalendar
-            ? "Checking calendar..."
-            : calendarConnected
-            ? "✅ Calendar Connected"
-            : "Calendar not connected"}
-        </Text>
-      </View>
-
-      {!calendarConnected && !checkingCalendar && (
-        <TouchableOpacity
-          style={styles.connectCalendarButton}
-          onPress={handleConnectCalendar}
-          disabled={isAuthLoading}
-        >
-          {isAuthLoading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="link" size={20} color="#fff" />
-              <Text style={styles.connectCalendarText}>
-                Connect Google Calendar
-              </Text>
-            </>
-          )}
-        </TouchableOpacity>
-      )}
-
-      {calendarConnected && (
-        <>
-          <Text style={styles.calendarHint}>
-            💡 Now you can ask me about your schedule, create events, and check
-            for conflicts!
-          </Text>
-          <View style={styles.calendarActions}>
-            <TouchableOpacity
-              style={styles.resetButton}
-              onPress={handleResetConnection}
-            >
-              <Ionicons name="refresh" size={16} color={colors.primary} />
-              <Text style={styles.resetButtonText}>Reset Connection</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.disconnectButton}
-              onPress={handleDisconnectCalendar}
-            >
-              <Ionicons
-                name="close-circle"
-                size={16}
-                color={colors.light.error}
-              />
-              <Text style={styles.disconnectButtonText}>Disconnect</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
     </View>
   );
 
@@ -444,59 +249,6 @@ export default function AIChatScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       keyboardVerticalOffset={100}
     >
-      {/* Calendar connection banner - shows when not connected */}
-      {!calendarConnected && !checkingCalendar && messages.length > 0 && (
-        <View style={styles.calendarBanner}>
-          <View style={styles.calendarBannerContent}>
-            <Ionicons
-              name="calendar-outline"
-              size={20}
-              color={colors.light.textSecondary}
-            />
-            <Text style={styles.calendarBannerText}>
-              Calendar not connected
-            </Text>
-          </View>
-          <TouchableOpacity
-            style={styles.connectBannerButton}
-            onPress={handleConnectCalendar}
-            disabled={isAuthLoading}
-          >
-            {isAuthLoading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <Text style={styles.connectBannerButtonText}>Connect</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Calendar connected banner - shows when connected (with disconnect option) */}
-      {calendarConnected && !checkingCalendar && messages.length > 0 && (
-        <View style={[styles.calendarBanner, { backgroundColor: "#E6F7E6" }]}>
-          <View style={styles.calendarBannerContent}>
-            <Ionicons name="calendar" size={20} color={colors.primary} />
-            <Text style={styles.calendarBannerText}>✅ Calendar Connected</Text>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.connectBannerButton,
-              { borderColor: colors.light.error },
-            ]}
-            onPress={handleResetConnection}
-          >
-            <Text
-              style={[
-                styles.connectBannerButtonText,
-                { color: colors.light.error },
-              ]}
-            >
-              Reset
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
-
       {messages.length === 0 ? (
         renderEmptyState()
       ) : (
@@ -634,120 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.light.textTertiary,
     textAlign: "center",
-  },
-  calendarSection: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 24,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: colors.light.inputBackground,
-    borderRadius: 12,
-    gap: 8,
-  },
-  calendarStatusText: {
-    fontSize: 14,
-    color: colors.light.textSecondary,
-    fontWeight: "500",
-  },
-  connectCalendarButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginTop: 16,
-    gap: 8,
-    minWidth: 200,
-  },
-  connectCalendarText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  calendarHint: {
-    fontSize: 13,
-    color: colors.light.textSecondary,
-    textAlign: "center",
-    marginTop: 16,
-    fontStyle: "italic",
-    paddingHorizontal: 32,
-  },
-  calendarActions: {
-    flexDirection: "row",
-    gap: 12,
-    marginTop: 12,
-    justifyContent: "center",
-  },
-  resetButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    backgroundColor: colors.light.background,
-  },
-  resetButtonText: {
-    fontSize: 13,
-    color: colors.primary,
-    fontWeight: "600",
-  },
-  disconnectButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.light.error,
-    backgroundColor: colors.light.background,
-  },
-  disconnectButtonText: {
-    fontSize: 13,
-    color: colors.light.error,
-    fontWeight: "600",
-  },
-  calendarBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "#FFF9E6",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#FFE4B5",
-  },
-  calendarBannerContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  calendarBannerText: {
-    fontSize: 14,
-    color: colors.light.textPrimary,
-    fontWeight: "500",
-  },
-  connectBannerButton: {
-    backgroundColor: colors.light.background,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    minWidth: 80,
-    alignItems: "center",
-  },
-  connectBannerButtonText: {
-    color: colors.primary,
-    fontSize: 14,
-    fontWeight: "600",
   },
   thinkingContainer: {
     marginBottom: 12,
