@@ -26,11 +26,7 @@ interface AIState {
   error: string | null;
 
   // Actions
-  sendMessage: (
-    userId: string,
-    content: string,
-    timezone?: string
-  ) => Promise<void>;
+  sendMessage: (userId: string, content: string) => Promise<void>;
   loadConversation: (userId: string) => Promise<void>;
   submitFeedback: (
     userId: string,
@@ -59,7 +55,7 @@ export const useAIStore = create<AIState>((set, get) => ({
    * Send a message to the AI assistant
    * Follows optimistic UI pattern like chatStore.ts
    */
-  sendMessage: async (userId: string, content: string, timezone?: string) => {
+  sendMessage: async (userId: string, content: string) => {
     const trimmedContent = content.trim();
     if (!trimmedContent || !userId) {
       console.warn("⚠️ Cannot send empty message or missing userId");
@@ -94,8 +90,7 @@ export const useAIStore = create<AIState>((set, get) => ({
       const response = await sendAIChat(
         userId,
         trimmedContent,
-        conversationHistory,
-        timezone
+        conversationHistory
       );
 
       if (response.success && response.data) {

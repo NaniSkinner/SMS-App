@@ -287,11 +287,8 @@ export default function AIChatScreen() {
     setInputText(""); // Clear input immediately for better UX
     setInputHeight(40); // Reset input height
 
-    // Get user's timezone (Chicago)
-    const timezone = "America/Chicago";
-
     // Send message via store (handles API call + Firestore persistence)
-    await sendMessage(user.id, messageContent, timezone);
+    await sendMessage(user.id, messageContent);
 
     // Scroll to bottom after message sent
     setTimeout(() => {

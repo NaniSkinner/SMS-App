@@ -61,7 +61,9 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? colors.dark.background : colors.light.card,
+          backgroundColor: isDark
+            ? colors.dark.background
+            : colors.light.background,
           borderColor: isDark ? colors.dark.border : colors.light.border,
         },
       ]}
@@ -74,7 +76,11 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
             <Text
               style={[
                 styles.title,
-                { color: isDark ? colors.dark.text : colors.light.text },
+                {
+                  color: isDark
+                    ? colors.dark.textPrimary
+                    : colors.light.textPrimary,
+                },
               ]}
               numberOfLines={1}
             >
@@ -112,7 +118,11 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
           <Text
             style={[
               styles.summaryCount,
-              { color: isDark ? colors.dark.text : colors.light.text },
+              {
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+              },
             ]}
           >
             {yesCount}
@@ -137,7 +147,11 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
           <Text
             style={[
               styles.summaryCount,
-              { color: isDark ? colors.dark.text : colors.light.text },
+              {
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+              },
             ]}
           >
             {noCount}
@@ -162,7 +176,11 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
           <Text
             style={[
               styles.summaryCount,
-              { color: isDark ? colors.dark.text : colors.light.text },
+              {
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+              },
             ]}
           >
             {maybeCount}
@@ -187,7 +205,11 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
           <Text
             style={[
               styles.summaryCount,
-              { color: isDark ? colors.dark.text : colors.light.text },
+              {
+                color: isDark
+                  ? colors.dark.textPrimary
+                  : colors.light.textPrimary,
+              },
             ]}
           >
             {pendingCount}
@@ -264,7 +286,9 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
                     style={[
                       styles.responseName,
                       {
-                        color: isDark ? colors.dark.text : colors.light.text,
+                        color: isDark
+                          ? colors.dark.textPrimary
+                          : colors.light.textPrimary,
                       },
                     ]}
                   >
@@ -323,7 +347,9 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
                     style={[
                       styles.responseName,
                       {
-                        color: isDark ? colors.dark.text : colors.light.text,
+                        color: isDark
+                          ? colors.dark.textPrimary
+                          : colors.light.textPrimary,
                       },
                     ]}
                   >
@@ -379,7 +405,9 @@ export const RSVPTrackerCard: React.FC<RSVPTrackerCardProps> = ({
                     style={[
                       styles.responseName,
                       {
-                        color: isDark ? colors.dark.text : colors.light.text,
+                        color: isDark
+                          ? colors.dark.textPrimary
+                          : colors.light.textPrimary,
                       },
                     ]}
                   >

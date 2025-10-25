@@ -26,10 +26,10 @@ import { db } from "./firebase.config";
 
 /**
  * Helper function to safely convert timestamps to Date objects
- * Handles Firestore Timestamps, Date objects, strings, and null
+ * Handles Firestore Timestamps, Date objects, strings, and undefined
  */
-function convertToDate(timestamp: any): Date | null {
-  if (!timestamp) return null;
+function convertToDate(timestamp: any): Date | undefined {
+  if (!timestamp) return undefined;
 
   if (typeof timestamp.toDate === "function") {
     // It's a Firestore Timestamp
@@ -45,7 +45,7 @@ function convertToDate(timestamp: any): Date | null {
     return new Date(timestamp);
   }
 
-  return null;
+  return undefined;
 }
 
 /**
