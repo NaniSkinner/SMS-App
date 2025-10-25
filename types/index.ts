@@ -309,14 +309,46 @@ export interface AIExtractEventRequest {
 
 export interface AIExtractedEvent {
   title: string;
-  dateTime: string;
+  date: string; // YYYY-MM-DD
+  time: string; // HH:MM
+  duration: number; // minutes
   location?: string;
   description?: string;
-  confidence: "high" | "medium" | "low";
+  confidence: number; // 0-1 score
+  ambiguousFields?: string[];
+}
+
+export interface CalendarEvent {
+  id?: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string; // HH:MM
+  duration: number; // minutes
+  location?: string;
+  description?: string;
+  overlapMinutes?: number; // For conflicts
 }
 
 export interface AIExtractEventResponse {
-  event: AIExtractedEvent | null;
   hasEvent: boolean;
-  timestamp: string;
+  event?: AIExtractedEvent;
+  conflicts?: CalendarEvent[];
+  needsConfirmation?: boolean;
+  alternativeTimes?: string[];
+}
+
+// For storing AI suggestions on messages
+export interface AISuggestion {
+  id: string;
+  messageId: string;
+  conversationId: string;
+  userId: string;
+  createdAt: Date;
+  type: "event_extracted" | "conflict_detected";
+  extractedEvent?: AIExtractedEvent;
+  conflicts?: CalendarEvent[];
+  alternativeTimes?: string[];
+  userAction?: "accepted" | "dismissed" | "modified";
+  wasHelpful?: boolean;
 }

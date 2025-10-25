@@ -3,10 +3,12 @@
  * Individual conversation screen with messages
  */
 
+import { ConflictModal } from "@/components/chat/ConflictModal";
+import { EventExtractionCard } from "@/components/chat/EventExtractionCard";
 import { MessageInput } from "@/components/chat/MessageInput";
 import { MessageList } from "@/components/chat/MessageList";
 import { Avatar } from "@/components/common/Avatar";
-import { extractEventFromText } from "@/services/ai";
+import { extractEventFromText, sendAIChat } from "@/services/ai";
 import {
   addToOfflineQueue,
   cacheMessages,
@@ -70,8 +72,10 @@ export default function ChatScreen() {
   const [showReadStatusModal, setShowReadStatusModal] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   const [showAnalysisModal, setShowAnalysisModal] = useState(false);
+  const [showConflictModal, setShowConflictModal] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAddingToCalendar, setIsAddingToCalendar] = useState(false);
 
   const conversationId = id!;
   const conversation = conversations.find((c) => c.id === conversationId);
@@ -373,13 +377,141 @@ export default function ChatScreen() {
       console.log("✅ Analysis result:", result.data);
 
       setAnalysisResult(result.data);
-      setShowAnalysisModal(true);
+
+      // Only show modal if event was found
+      if (result.data.hasEvent) {
+        setShowAnalysisModal(true);
+      } else {
+        setError("No calendar event detected in this message.");
+      }
     } catch (error) {
       console.error("❌ Error analyzing message:", error);
       setError("Failed to analyze message. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
+  };
+
+  // Add event to calendar using AI
+  const handleAddToCalendar = async (alternativeTime?: string) => {
+    if (!user || !analysisResult?.event) return;
+
+    setIsAddingToCalendar(true);
+    setError(null);
+
+    try {
+      const event = analysisResult.event;
+
+      // Use alternative time if provided (and is a string), otherwise use original time
+      const timeToUse =
+        typeof alternativeTime === "string" && alternativeTime
+          ? alternativeTime
+          : event.time;
+
+      // Validate that we have a valid time string
+      if (!timeToUse || typeof timeToUse !== "string") {
+        throw new Error(`Invalid time format: ${timeToUse}`);
+      }
+
+      console.log(
+        `📅 Adding event to calendar: ${event.title} at ${timeToUse}`
+      );
+
+      // Format the time properly for the AI (convert 24-hour to 12-hour with AM/PM)
+      const formatTimeForAI = (time24: string): string => {
+        if (!time24 || typeof time24 !== "string" || !time24.includes(":")) {
+          console.error("Invalid time format:", time24);
+          return time24; // Return as-is if invalid
+        }
+        const [hours, minutes] = time24.split(":");
+        const hour = parseInt(hours);
+        const ampm = hour >= 12 ? "PM" : "AM";
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${minutes} ${ampm}`;
+      };
+
+      const formattedTime = formatTimeForAI(timeToUse);
+
+      console.log(`📤 Formatted time: ${formattedTime}`);
+
+      // Create event via AI chat (which calls the createCalendarEvent tool)
+      const message = `Create a calendar event titled "${event.title}" on ${
+        event.date
+      } at ${formattedTime} for ${event.duration} minutes${
+        event.location ? ` at location ${event.location}` : ""
+      }${
+        event.description ? ` with description: ${event.description}` : ""
+      }. Please create this event now.`;
+
+      console.log(`📤 Sending to AI:`, message);
+
+      const result = await sendAIChat(user.id, message, []);
+
+      if (result.success && result.data) {
+        console.log("✅ AI Response received");
+        console.log("AI Reply:", result.data.reply);
+        console.log("Tools Called:", result.data.toolsCalled);
+
+        // Check if the event was actually created (AI should have called createCalendarEvent tool)
+        const wasCreated = result.data.toolsCalled?.includes(
+          "createCalendarEvent"
+        );
+
+        if (wasCreated) {
+          console.log("✅ Calendar event created successfully!");
+
+          // Close all modals and clear state
+          setShowAnalysisModal(false);
+          setShowConflictModal(false);
+          setAnalysisResult(null);
+          setSelectedMessage(null);
+
+          // Clear any previous errors
+          setError(null);
+
+          // Show success in console (in production, this would be a toast notification)
+          console.log(`✅ "${event.title}" added to your calendar!`);
+        } else {
+          // AI didn't create the event, show what it said
+          console.log("⚠️ AI did not create the event");
+          throw new Error(
+            `AI could not create the event. Response: ${result.data.reply}`
+          );
+        }
+      } else {
+        throw new Error(result.error || "Failed to create calendar event");
+      }
+    } catch (error: any) {
+      console.error("❌ Error adding to calendar:", error);
+      setError(
+        error.message || "Failed to add event to calendar. Please try again."
+      );
+    } finally {
+      setIsAddingToCalendar(false);
+    }
+  };
+
+  // View conflicts in detail modal
+  const handleViewConflicts = () => {
+    if (analysisResult?.conflicts && analysisResult.conflicts.length > 0) {
+      setShowConflictModal(true);
+    }
+  };
+
+  // Dismiss extraction card
+  const handleDismissAnalysis = () => {
+    setShowAnalysisModal(false);
+    setAnalysisResult(null);
+  };
+
+  // Book event anyway despite conflicts
+  const handleBookAnyway = async () => {
+    await handleAddToCalendar();
+  };
+
+  // Select alternative time
+  const handleSelectAlternative = async (time: string) => {
+    await handleAddToCalendar(time);
   };
 
   // Format typing indicator text
@@ -532,132 +664,36 @@ export default function ChatScreen() {
         </Modal>
       )}
 
-      {/* AI Analysis Modal */}
-      <Modal
-        visible={showAnalysisModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowAnalysisModal(false)}
-      >
-        <Pressable
-          style={styles.modalOverlay}
-          onPress={() => setShowAnalysisModal(false)}
-        >
-          <Pressable style={styles.modalContent}>
-            <Text style={styles.modalTitle}>🤖 AI Analysis</Text>
+      {/* AI Analysis - Event Extraction Card */}
+      {showAnalysisModal &&
+        analysisResult?.hasEvent &&
+        analysisResult.event && (
+          <View style={styles.extractionCardContainer}>
+            <EventExtractionCard
+              event={analysisResult.event}
+              conflicts={analysisResult.conflicts || []}
+              alternativeTimes={analysisResult.alternativeTimes}
+              onAddToCalendar={handleAddToCalendar}
+              onViewConflicts={handleViewConflicts}
+              onDismiss={handleDismissAnalysis}
+              isLoading={isAddingToCalendar}
+            />
+          </View>
+        )}
 
-            {isAnalyzing ? (
-              <View style={styles.analysisLoading}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={styles.analysisLoadingText}>
-                  Analyzing message...
-                </Text>
-              </View>
-            ) : analysisResult?.hasEvent ? (
-              <View>
-                {/* Event Details */}
-                <View style={styles.analysisSection}>
-                  <Text style={styles.analysisSectionTitle}>
-                    📅 Event Found
-                  </Text>
-                  <View style={styles.eventDetails}>
-                    <Text style={styles.eventTitle}>
-                      {analysisResult.event.title}
-                    </Text>
-                    <Text style={styles.eventDetail}>
-                      📆 {analysisResult.event.date} at{" "}
-                      {analysisResult.event.time}
-                    </Text>
-                    <Text style={styles.eventDetail}>
-                      ⏱️ Duration: {analysisResult.event.duration} minutes
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Conflict Status - ALWAYS show this section */}
-                <View style={styles.analysisSection}>
-                  {analysisResult.conflicts &&
-                  analysisResult.conflicts.length > 0 ? (
-                    <>
-                      {/* HAS CONFLICTS */}
-                      <View style={styles.conflictHeader}>
-                        <Text style={styles.conflictHeaderText}>
-                          ⚠️ {analysisResult.conflicts.length} Conflict
-                          {analysisResult.conflicts.length > 1 ? "s" : ""}{" "}
-                          Detected
-                        </Text>
-                      </View>
-                      {analysisResult.conflicts.map(
-                        (conflict: any, index: number) => (
-                          <View key={index} style={styles.conflictItem}>
-                            <Text style={styles.conflictTitle}>
-                              {conflict.title}
-                            </Text>
-                            <Text style={styles.conflictTime}>
-                              {conflict.startTime} - {conflict.endTime}
-                            </Text>
-                            {conflict.overlapMinutes && (
-                              <Text style={styles.conflictOverlap}>
-                                Overlaps by {conflict.overlapMinutes} min
-                              </Text>
-                            )}
-                          </View>
-                        )
-                      )}
-                    </>
-                  ) : (
-                    <>
-                      {/* NO CONFLICTS */}
-                      <View style={styles.availableHeader}>
-                        <Text style={styles.availableHeaderText}>
-                          ✅ Available on Calendar
-                        </Text>
-                      </View>
-                      <View style={styles.availableMessage}>
-                        <Text style={styles.availableMessageText}>
-                          No events scheduled during this time
-                        </Text>
-                      </View>
-                    </>
-                  )}
-                </View>
-
-                {/* Alternative Times - Only show if conflicts exist */}
-                {analysisResult.alternativeTimes &&
-                  analysisResult.alternativeTimes.length > 0 &&
-                  analysisResult.conflicts &&
-                  analysisResult.conflicts.length > 0 && (
-                    <View style={styles.analysisSection}>
-                      <Text style={styles.analysisSectionTitle}>
-                        💡 Alternative Times
-                      </Text>
-                      {analysisResult.alternativeTimes.map(
-                        (time: string, index: number) => (
-                          <Text key={index} style={styles.alternativeTime}>
-                            • {time}
-                          </Text>
-                        )
-                      )}
-                    </View>
-                  )}
-              </View>
-            ) : (
-              <View style={styles.analysisEmpty}>
-                <Text style={styles.analysisEmptyText}>
-                  No calendar events detected in this message.
-                </Text>
-              </View>
-            )}
-
-            <Pressable
-              style={styles.modalCloseButton}
-              onPress={() => setShowAnalysisModal(false)}
-            >
-              <Text style={styles.modalCloseText}>Close</Text>
-            </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      {/* Conflict Modal */}
+      {analysisResult?.event && (
+        <ConflictModal
+          visible={showConflictModal}
+          event={analysisResult.event}
+          conflicts={analysisResult.conflicts || []}
+          alternativeTimes={analysisResult.alternativeTimes}
+          onClose={() => setShowConflictModal(false)}
+          onBookAnyway={handleBookAnyway}
+          onSelectAlternative={handleSelectAlternative}
+          isLoading={isAddingToCalendar}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
@@ -908,5 +944,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.light.textSecondary,
     textAlign: "center",
+  },
+  extractionCardContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
   },
 });
