@@ -309,6 +309,10 @@ Built with React Native, OpenAI, Firebase.
   - [x] ConflictModal shows conflicts + alternative times
   - [x] "Add to Calendar" creates events via AI chat
   - [x] Handles various date/time formats (tested)
+  - [x] **NEW:** Calendar connection check before event creation
+  - [x] **NEW:** User-friendly alert if calendar not connected
+  - [x] **NEW:** Success confirmation alert with event details
+  - [x] **NEW:** "View Calendar" button to open Google Calendar
 - [x] **Decision Summarization (Task 2.2 - COMPLETED ✅)**
   - [x] "Summarize" button in group chat header
   - [x] DecisionSummaryCard shows question, final decision, participants
@@ -457,6 +461,10 @@ This tests 8 different message formats:
 - [x] ✅ UI is polished and user-friendly
 - [x] ✅ End-to-end flow tested and working in iOS simulator
 - [x] ✅ Events successfully created in Google Calendar
+- [x] ✅ **NEW:** Calendar connection check before event creation
+- [x] ✅ **NEW:** User-friendly alert if calendar not connected with navigation option
+- [x] ✅ **NEW:** Success confirmation alert after event creation
+- [x] ✅ **NEW:** "View Calendar" button opens Google Calendar at event date
 
 ---
 
@@ -543,6 +551,29 @@ This tests 8 different message formats:
 - Handlers added for: `handleAddToCalendar`, `handleViewConflicts`, `handleDismissAnalysis`
 - Add to Calendar uses AI chat to call `createCalendarEvent` tool
 
+**Recent Enhancements (October 25, 2025):**
+
+1. **Pre-flight Calendar Connection Check**
+
+   - Before attempting to create events, app now checks if Google Calendar is connected
+   - If not connected, shows user-friendly alert with two options:
+     - "Cancel" - Stay in current chat
+     - "Go to AI Chat" - Navigate directly to AI Chat screen to connect calendar
+   - Prevents cryptic AI error messages about authentication issues
+   - Uses `isCalendarConnected()` from `services/googleAuth.ts`
+
+2. **Success Confirmation with Actions**
+   - After successful event creation, displays native iOS alert with:
+     - Title: "✅ Event Created"
+     - Message: Shows event title, date, and formatted time
+     - Example: `"Team Meeting" has been added to your Google Calendar on 2024-10-28 at 2:00 PM.`
+   - Two action buttons:
+     - **"View Calendar"** - Opens Google Calendar web app at the event's date
+     - **"OK"** - Dismisses alert and returns to chat
+   - Uses React Native `Linking` API to open calendar URL
+   - Calendar URL format: `https://calendar.google.com/calendar/u/0/r/day/YYYYMMDD`
+   - Provides immediate visual confirmation and easy access to verify the event
+
 **Types Updated:**
 
 - Enhanced `AIExtractedEvent` with proper fields
@@ -574,6 +605,9 @@ chmod +x test-event-extraction.sh
 5. Verify EventExtractionCard appears with event details
 6. If you have calendar events, conflicts will show
 7. Tap "Add to Calendar" to create the event
+8. **NEW:** If calendar not connected, see alert with "Go to AI Chat" option
+9. **NEW:** After successful creation, see confirmation alert with event details
+10. **NEW:** Tap "View Calendar" to open Google Calendar web app at event date
 
 ### Files Modified/Created
 
@@ -587,7 +621,7 @@ chmod +x test-event-extraction.sh
 **Modified:**
 
 - `types/index.ts` - Updated AI types
-- `app/chat/[id].tsx` - Integrated components + handlers
+- `app/chat/[id].tsx` - Integrated components + handlers + calendar connection check + success confirmation
 - `Docs/aiTask2.md` - Updated with completion status + testing guide
 
 ### Known Issues & Solutions

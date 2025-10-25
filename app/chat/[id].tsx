@@ -27,6 +27,7 @@ import {
   subscribeToMessages,
 } from "@/services/chat";
 import { resetUnreadCount, updateLastMessage } from "@/services/conversations";
+import { isCalendarConnected } from "@/services/googleAuth";
 import { subscribeToUserPresence } from "@/services/presence";
 import {
   clearUserTyping,
@@ -44,8 +45,10 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable,
@@ -414,6 +417,23 @@ export default function ChatScreen() {
   const handleAddToCalendar = async (alternativeTime?: string) => {
     if (!user || !analysisResult?.event) return;
 
+    // Check if calendar is connected first
+    const calendarIsConnected = await isCalendarConnected();
+    if (!calendarIsConnected) {
+      Alert.alert(
+        "📅 Calendar Not Connected",
+        "Please connect your Google Calendar first to add events. You can connect it in the AI Chat screen.",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Go to AI Chat",
+            onPress: () => router.push("/(tabs)/ai-chat"),
+          },
+        ]
+      );
+      return;
+    }
+
     setIsAddingToCalendar(true);
     setError(null);
 
@@ -435,8 +455,8 @@ export default function ChatScreen() {
         `📅 Adding event to calendar: ${event.title} at ${timeToUse}`
       );
 
-      // Format the time properly for the AI (convert 24-hour to 12-hour with AM/PM)
-      const formatTimeForAI = (time24: string): string => {
+      // Format the time for display (convert 24-hour to 12-hour with AM/PM)
+      const formatTime = (time24: string): string => {
         if (!time24 || typeof time24 !== "string" || !time24.includes(":")) {
           console.error("Invalid time format:", time24);
           return time24; // Return as-is if invalid
@@ -448,7 +468,7 @@ export default function ChatScreen() {
         return `${displayHour}:${minutes} ${ampm}`;
       };
 
-      const formattedTime = formatTimeForAI(timeToUse);
+      const formattedTime = formatTime(timeToUse);
 
       console.log(`📤 Formatted time: ${formattedTime}`);
 
@@ -487,8 +507,28 @@ export default function ChatScreen() {
           // Clear any previous errors
           setError(null);
 
-          // Show success in console (in production, this would be a toast notification)
-          console.log(`✅ "${event.title}" added to your calendar!`);
+          // Show success message with options
+          Alert.alert(
+            "✅ Event Created",
+            `"${event.title}" has been added to your Google Calendar on ${event.date} at ${formattedTime}.`,
+            [
+              {
+                text: "View Calendar",
+                onPress: () => {
+                  // Open Google Calendar web view with the date
+                  const calendarDate = event.date.replace(/-/g, "");
+                  const calendarUrl = `https://calendar.google.com/calendar/u/0/r/day/${calendarDate}`;
+                  Linking.openURL(calendarUrl).catch((err) =>
+                    console.error("Error opening calendar:", err)
+                  );
+                },
+              },
+              {
+                text: "OK",
+                style: "cancel",
+              },
+            ]
+          );
         } else {
           // AI didn't create the event, show what it said
           console.log("⚠️ AI did not create the event");
